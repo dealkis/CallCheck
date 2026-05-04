@@ -95,19 +95,23 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = None
-    sucesso = None
-    
     if request.method == "POST":
         usuario_digitado = request.form.get("usuario")
         senha_digitada = request.form.get("senha")
 
-        # Lógica de teste sem banco de dados
+        # Simulação de banco de dados
         if usuario_digitado == "admin" and senha_digitada == "123":
-            sucesso = "Login realizado com sucesso! Bem-vindo ao painel ACEX."
+            # Redireciona para a função 'perfil_usuario' abaixo
+            return redirect(url_for('perfil_usuario'))
         else:
             erro = "Usuário não encontrado ou senha incorreta."
     
-    return render_template("login.html", erro=erro, sucesso=sucesso)
+    return render_template("login.html", erro=erro)
+
+# Nova rota para a página do usuário logado
+@app.route("/usuario")
+def perfil_usuario():
+    return render_template("usuario.html")
 
 @app.route("/sobre")
 def sobre():
