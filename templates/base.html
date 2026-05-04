@@ -2,27 +2,47 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CallCheck - Projeto Faculdade</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <title>CallCheck - Verificador</title>
+    <style>
+        body { margin: 0; font-family: Arial; background: #f4f6f9; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: white; }
+        .logo { font-weight: bold; font-size: 20px; }
+        nav a { margin: 0 15px; text-decoration: none; color: black; }
+        .login-btn { padding: 8px 15px; background: #000; color: #fff; border: none; cursor: pointer; border-radius: 5px; text-decoration: none; }
+        .hero { text-align: center; padding: 40px; }
+        .form-box input { padding: 10px; margin: 10px; width: 250px; }
+        .form-box button { padding: 10px 20px; cursor: pointer; }
+        .resultado { display: flex; align-items: flex-start; gap: 20px; background: white; margin: 30px auto; padding: 20px; width: 45%; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .icone { font-size: 40px; }
+        .info { flex: 1; }
+        .colunas { display: flex; gap: 40px; margin-top: 15px; }
+        .coluna { flex: 1; }
+        .features { display: flex; justify-content: center; gap: 50px; margin-top: 50px; padding-bottom: 40px; }
+        .sucesso { border-left: 5px solid green; }
+        .erro { border-left: 5px solid red; }
+        .alerta { border-left: 5px solid orange; }
+        ul { padding-left: 20px; }
+    </style>
 </head>
 <body>
-    <nav class="container">
-        <ul>
-            <li><strong>CallCheck</strong></li>
-        </ul>
-        <ul>
-            <li><a href="{{ url_for('index') }}">Verificação</a></li>
-            <li><a href="{{ url_for('login') }}" class="outline">Login</a></li>
-        </ul>
+
+<header>
+    <div class="logo">✔ CallCheck</div>
+    <nav>
+        <a href="{{ url_for('index') }}">Verificação</a>
+        <a href="{{ url_for('sobre') }}">Sobre</a>
+        <a href="#">Contato</a>
     </nav>
+    <a href="{{ url_for('login') }}" class="login-btn">Login</a>
+</header>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+{% block content %}{% endblock %}
 
-    <footer class="container">
-        <small>© 2026 Projeto de Faculdade - CallCheck</small>
-    </footer>
+<section class="features">
+    <div>🔍 Validação Instantânea</div>
+    <div>📞 Detalhes do Telefone</div>
+    <div>🔒 Segurança Garantida</div>
+</section>
+
 </body>
 </html>
