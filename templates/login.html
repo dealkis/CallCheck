@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <article style="max-width: 400px; margin: auto;">
-        <h2>Login</h2>
-        <form>
-            <label>Usuário</label>
-            <input type="text" name="user" placeholder="Seu usuário">
-            
-            <label>Senha</label>
-            <input type="password" name="password" placeholder="********">
-            
-            <button type="submit">Entrar</button>
-        </form>
-    </article>
+<section class="hero">
+    <h1>Acesse sua conta</h1>
+</section>
+
+<div class="resultado" style="flex-direction: column; align-items: center; width: 350px;">
+    <form class="form-box" style="display: flex; flex-direction: column; width: 100%;">
+        <input type="text" placeholder="👤 Usuário" required>
+        <input type="password" placeholder="🔒 Senha" required>
+        <button type="submit" style="background: #000; color: #fff; border: none; border-radius: 5px;">Entrar</button>
+    </form>
+    <p><small><a href="#" style="color: gray;">Esqueceu a senha?</a></small></p>
+</div>
 {% endblock %}
