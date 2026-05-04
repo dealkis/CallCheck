@@ -2,8 +2,9 @@
 
 {% block content %}
 <section class="hero">
-    <h1>Bem-vindo, Administrador</h1>
-    <p>Você está conectado ao painel de controle do CallCheck.</p>
+    <!-- O Flask busca automaticamente na sessão se você usar 'session' -->
+    <h1>Bem-vindo, {{ session['usuario_logado'] }}!</h1>
+    <p>Você está conectado com privilégios de Administrador.</p>
 </section>
 
 <div class="resultado" style="width: 80%; margin: 0 auto; padding: 20px;">
