@@ -99,8 +99,11 @@ def login():
 def sobre():
     return render_template("sobre.html")
 
-@app.route("/contato")
+@app.route("/contato", methods=["GET", "POST"])
 def contato():
+    if request.method == "POST":
+        # Simulamos que os dados foram processados sem precisar do SQL agora
+        return render_template("contato.html", sucesso=True)
     return render_template("contato.html")
 
 if __name__ == "__main__":
