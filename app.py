@@ -1,11 +1,11 @@
-from flask import Flask, render_template, request, url_for
+from flask import Flask, render_template, request, url_for, redirect
 import mysql.connector
 import os
 
 app = Flask(__name__)
 
 # =========================
-# CONFIGURAÇÃO DE CONEXÃO
+# CONFIGURAÇÃO DE CONEXÃO (Seu código original)
 # =========================
 def conectar():
     try:
@@ -21,7 +21,7 @@ def conectar():
         return None
 
 # =========================
-# LÓGICA DE VERIFICAÇÃO (Sua lógica original)
+# LÓGICA DE VERIFICAÇÃO (Seu código original)
 # =========================
 def verificar_empresa(nome, telefone=None):
     conn = conectar()
@@ -31,7 +31,7 @@ def verificar_empresa(nome, telefone=None):
             "telefones": ["Conexão com banco indisponível"],
             "emails": ["contato@exemplo.com"],
             "status": "SIMULACAO",
-            "mensagem": "Nota: O sistema está em modo de demonstração (banco não detectado)."
+            "mensagem": "Nota: O sistema está em modo de demonstração pois não detectou um banco de dados ativo."
         }
 
     try:
@@ -41,12 +41,12 @@ def verificar_empresa(nome, telefone=None):
 
         if not empresa:
             conn.close()
-            return {"status": "ERRO", "mensagem": "Empresa não encontrada."}
+            return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base de dados oficial."}
 
         cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
         telefones = [t["numero"] for t in cursor.fetchall()]
         
-        emails = ["atendimento@oficial.com.br"] # Exemplo fixo conforme seu código
+        emails = ["atendimento@oficial.com.br"]
 
         denuncias = []
         if telefone:
@@ -59,29 +59,27 @@ def verificar_empresa(nome, telefone=None):
             denuncias = cursor.fetchall()
 
         conn.close()
-
         resposta = {"empresa": empresa["nome"], "telefones": telefones, "emails": emails}
 
         if not telefone:
-            resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais registrados."})
+            resposta.update({"status": "CANAIS", "mensagem": "Estes são os canais oficiais registrados para esta empresa."})
         elif telefone in telefones:
-            resposta.update({"status": "OFICIAL", "mensagem": "Número verificado!"})
+            resposta.update({"status": "OFICIAL", "mensagem": "Este é um número verificado e pertence à empresa."})
         elif denuncias:
-            resposta.update({"status": "ALERTA", "mensagem": "Este número possui denúncias!", "denuncias": denuncias})
+            resposta.update({"status": "ALERTA", "mensagem": "Atenção! Este número possui denúncias de atividades suspeitas.", "denuncias": denuncias})
         else:
-            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Número NÃO consta na lista oficial."})
+            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Este número NÃO consta na lista oficial da empresa."})
         
         return resposta
 
     except Exception as e:
         if conn: conn.close()
-        return {"status": "ERRO", "mensagem": f"Erro interno: {str(e)}"}
+        return {"status": "ERRO", "mensagem": f"Erro interno no processamento: {str(e)}"}
 
 # =========================
 # ROTAS DO SITE
 # =========================
 
-# Página de Verificação (Home)
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
@@ -91,17 +89,16 @@ def index():
         if numero_tel:
             numero_tel = numero_tel.strip()
         resultado = verificar_empresa(nome_empresa, numero_tel)
-    
     return render_template("index.html", resultado=resultado)
 
-# Página de Login
 @app.route("/login")
 def login():
     return render_template("login.html")
 
-# =========================
-# EXECUÇÃO
-# =========================
+@app.route("/sobre")
+def sobre():
+    return render_template("sobre.html")
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
