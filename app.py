@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, url_for, redirect, session
+from flask import Flask, render_template, request, redirect, url_for, session
 import mysql.connector
 import os
 
@@ -99,26 +99,29 @@ def login():
         usuario_digitado = request.form.get("usuario")
         senha_digitada = request.form.get("senha")
 
+        # Simulação de login
         if usuario_digitado == "admin" and senha_digitada == "123":
-            session["usuario_logado"] = usuario_digitado # Salva na sessão
+            session["usuario_logado"] = usuario_digitado
             return redirect(url_for('perfil_usuario'))
         else:
             erro = "Usuário não encontrado ou senha incorreta."
     
     return render_template("login.html", erro=erro)
 
-# Nova rota para a página do usuário logado
 @app.route("/usuario")
 def perfil_usuario():
+    # Verifica se o usuário tem o "crachá" de sessão
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
+        
+    return render_template("usuario.html")
 
 @app.route("/logout")
 def logout():
-    session.pop("usuario_logado", None) # Remove o usuário da sessão
+    # Remove a sessão e desloga o usuário
+    session.pop("usuario_logado", None)
     return redirect(url_for('login'))
-        
-    return render_template("usuario.html")
+    
 @app.route("/sobre")
 def sobre():
     return render_template("sobre.html")
