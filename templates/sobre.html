@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <h1>Sobre o CallCheck</h1>
+    <p>Segurança e transparência na comunicação empresarial.</p>
+</section>
+
+<div class="resultado" style="flex-direction: column; width: 60%; line-height: 1.6;">
+    <div class="info">
+        <h3>O que é o projeto?</h3>
+        <p>
+            O <strong>CallCheck</strong> é uma plataforma desenvolvida para auxiliar cidadãos e empresas na identificação de canais de comunicação oficiais. 
+            Em um cenário onde golpes de <i>phishing</i> e fraudes telefônicas são cada vez mais comuns, nossa ferramenta surge como uma camada extra de proteção.
+        </p>
+
+        <h3>Nossa Missão</h3>
+        <p>
+            Nosso objetivo é centralizar e validar números de telefone e e-mails de empresas parceiras. Ao realizar uma busca, você recebe instantaneamente o status do contato:
+        </p>
+        <ul>
+            <li><strong>Oficial:</strong> O número pertence comprovadamente à empresa.</li>
+            <li><strong>Não Oficial:</strong> O número não consta nos registros oficiais fornecidos.</li>
+            <li><strong>Alerta:</strong> Contatos que já possuem denúncias de atividades suspeitas em nossa base.</li>
+        </ul>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px;">
+            <h4>📌 Projeto ACEX</h4>
+            <p>
+                Este sistema foi desenvolvido como parte integrante do projeto <strong>ACEX (Atividade Curricular de Extensão)</strong>. 
+                O foco desta iniciativa é aplicar o conhecimento técnico acadêmico em soluções que tragam impacto social direto e promovam a segurança digital da comunidade.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
