@@ -2,15 +2,49 @@
 
 {% block content %}
 <section class="hero">
-    <h1>Acesse sua conta</h1>
+    <h1>Área Restrita</h1>
+    <p>Acesse o sistema CallCheck para gerenciar denúncias.</p>
 </section>
 
-<div class="resultado" style="flex-direction: column; align-items: center; width: 350px;">
-    <form class="form-box" style="display: flex; flex-direction: column; width: 100%;">
-        <input type="text" placeholder="👤 Usuário" required>
-        <input type="password" placeholder="🔒 Senha" required>
-        <button type="submit" style="background: #000; color: #fff; border: none; border-radius: 5px;">Entrar</button>
-    </form>
-    <p><small><a href="#" style="color: gray;">Esqueceu a senha?</a></small></p>
+<div class="resultado" style="flex-direction: column; width: 400px; margin: 0 auto; margin-top: 20px;">
+    <div class="info" style="padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="text-align: center; margin-bottom: 20px;">Login</h3>
+
+        <!-- ALERTA DE ERRO -->
+        {% if erro %}
+            <div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #f5c6cb; text-align: center;">
+                <strong>⚠️ Erro:</strong> {{ erro }}
+            </div>
+        {% endif %}
+
+        <!-- ALERTA DE SUCESSO -->
+        {% if sucesso %}
+            <div style="background: #d4edda; color: #155724; padding: 12px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #c3e6cb; text-align: center;">
+                <strong>✔ {{ sucesso }}</strong>
+            </div>
+        {% endif %}
+
+        <form action="/login" method="POST" style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column;">
+                <label for="usuario" style="font-weight: bold; margin-bottom: 5px;">Usuário:</label>
+                <input type="text" id="usuario" name="usuario" placeholder="Digite seu usuário" required 
+                       style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <label for="senha" style="font-weight: bold; margin-bottom: 5px;">Senha:</label>
+                <input type="password" id="senha" name="senha" placeholder="Digite sua senha" required 
+                       style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            </div>
+            
+            <button type="submit" style="background: #000; color: #fff; border: none; border-radius: 5px; padding: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.3s;">
+                Entrar no Sistema
+            </button>
+        </form>
+        
+        <p style="text-align: center; font-size: 0.8em; color: #666; margin-top: 20px;">
+            Dica: Use <strong>admin</strong> e senha <strong>123</strong> para testar.
+        </p>
+    </div>
 </div>
 {% endblock %}
