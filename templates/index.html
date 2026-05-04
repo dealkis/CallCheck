@@ -1,207 +1,26 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>CallCheck - Verificador</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% extends "base.html" %}
 
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial;
-            background: #f4f6f9;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 40px;
-            background: white;
-        }
-
-        .logo {
-            font-weight: bold;
-            font-size: 20px;
-        }
-
-        nav a {
-            margin: 0 15px;
-            text-decoration: none;
-            color: black;
-        }
-
-        .login {
-            padding: 8px 15px;
-        }
-
-        .hero {
-            text-align: center;
-            padding: 40px;
-        }
-
-        .form-box input {
-            padding: 10px;
-            margin: 10px;
-            width: 250px;
-        }
-
-        .form-box button {
-            padding: 10px 20px;
-        }
-
-        /* 🔥 RESULTADO WEB */
-        .resultado {
-            display: flex;
-            align-items: flex-start;
-            gap: 20px;
-            background: white;
-            margin: 30px auto;
-            padding: 20px;
-            width: 40%;
-            border-radius: 10px;
-        }
-
-        .icone {
-            font-size: 40px;
-        }
-
-        .info {
-            flex: 1;
-        }
-
-        .colunas {
-            display: flex;
-            gap: 40px;
-        }
-
-        .coluna {
-            flex: 1;
-        }
-
-        .features {
-            display: flex;
-            justify-content: center;
-            gap: 50px;
-            margin-top: 50px;
-        }
-
-        .sucesso { border-left: 5px solid green; }
-        .erro { border-left: 5px solid red; }
-        .alerta { border-left: 5px solid orange; }
-
-    </style>
-</head>
-<body>
-
-<header>
-    <div class="logo">✔ CallCheck</div>
-    <nav>
-        <a href="#">Verificação</a>
-        <a href="#">Sobre</a>
-        <a href="#">Contato</a>
-    </nav>
-    <button class="login">Login</button>
-</header>
-
-<section class="hero">
-    <h1>Verifique o número de telefone da empresa</h1>
-
-    <form method="POST" class="form-box">
-        <input type="text" name="nome" placeholder="🏢 Nome da empresa" required>
-        <input type="text" name="telefone" placeholder="📞 Telefone">
-        <button type="submit">Verificar</button>
+{% block content %}
+    <h1>Verificar Número</h1>
+    <form method="POST">
+        <input type="text" name="nome" placeholder="Nome da Empresa" required>
+        <input type="text" name="telefone" placeholder="Número do Telefone (Opcional)">
+        <button type="submit">Verificar Agora</button>
     </form>
-</section>
 
-{% if resultado %}
-<div class="resultado 
-    {% if resultado.status == 'OFICIAL' %}sucesso
-    {% elif resultado.status == 'ALERTA' %}alerta
-    {% else %}erro
-    {% endif %}">
-    
-    <!-- ÍCONE -->
-    <div class="icone">
-        {% if resultado.status == 'OFICIAL' %}✔
-        {% elif resultado.status == 'ALERTA' %}⚠
-        {% else %}✖
-        {% endif %}
-    </div>
-
-    <!-- INFORMAÇÕES -->
-    <div class="info">
-
-        <h3>
-            {% if resultado.status == 'OFICIAL' %}
-                Número Oficial
-            {% elif resultado.status == 'ALERTA' %}
-                Número com denúncias
-            {% elif resultado.status == 'CANAIS' %}
-                Canais oficiais
-            {% else %}
-                Número não oficial
-            {% endif %}
-        </h3>
-
-        <p><strong>Status:</strong> {{ resultado.status }}</p>
-
-        {% if resultado.empresa %}
-        <p><strong>Empresa:</strong> {{ resultado.empresa }}</p>
-        {% endif %}
-
-        <p>{{ resultado.mensagem }}</p>
-
-        <!-- 🔥 COLUNAS WEB -->
-        <div class="colunas">
-
-            <!-- TELEFONES -->
+    {% if resultado %}
+        <article>
+            <header>
+                <strong>Resultado para: {{ resultado.empresa }}</strong>
+            </header>
+            <p>{{ resultado.mensagem }}</p>
             {% if resultado.telefones %}
-            <div class="coluna">
-                <strong>📞 Telefones</strong>
                 <ul>
                     {% for tel in resultado.telefones %}
-                        <li>{{ tel }}</li>
+                        <li>Oficial: {{ tel }}</li>
                     {% endfor %}
                 </ul>
-            </div>
             {% endif %}
-
-            <!-- EMAILS -->
-            {% if resultado.emails %}
-            <div class="coluna">
-                <strong>📧 Emails</strong>
-                <ul>
-                    {% for email in resultado.emails %}
-                        <li>{{ email }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
-
-        </div>
-
-        <!-- DENÚNCIAS -->
-        {% if resultado.denuncias %}
-        <div>
-            <strong>🚨 Denúncias</strong>
-            <ul>
-                {% for d in resultado.denuncias %}
-                    <li>{{ d.tipo }} - {{ d.descricao }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-    </div>
-</div>
-{% endif %}
-
-<section class="features">
-    <div>🔍 Validação Instantânea</div>
-    <div>📞 Detalhes do Telefone</div>
-    <div>🔒 Segurança Garantida</div>
-</section>
-
-</body>
-</html>
+        </article>
+    {% endif %}
+{% endblock %}
