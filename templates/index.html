@@ -1,26 +1,70 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>Verificar Número</h1>
-    <form method="POST">
-        <input type="text" name="nome" placeholder="Nome da Empresa" required>
-        <input type="text" name="telefone" placeholder="Número do Telefone (Opcional)">
-        <button type="submit">Verificar Agora</button>
+<section class="hero">
+    <h1>Verifique o número de telefone da empresa</h1>
+    <form method="POST" class="form-box">
+        <input type="text" name="nome" placeholder="🏢 Nome da empresa" required>
+        <input type="text" name="telefone" placeholder="📞 Telefone">
+        <button type="submit">Verificar</button>
     </form>
+</section>
 
-    {% if resultado %}
-        <article>
-            <header>
-                <strong>Resultado para: {{ resultado.empresa }}</strong>
-            </header>
-            <p>{{ resultado.mensagem }}</p>
-            {% if resultado.telefones %}
-                <ul>
-                    {% for tel in resultado.telefones %}
-                        <li>Oficial: {{ tel }}</li>
-                    {% endfor %}
-                </ul>
+{% if resultado %}
+<div class="resultado 
+    {% if resultado.status == 'OFICIAL' %}sucesso
+    {% elif resultado.status == 'ALERTA' %}alerta
+    {% else %}erro
+    {% endif %}">
+    
+    <div class="icone">
+        {% if resultado.status == 'OFICIAL' %}✔
+        {% elif resultado.status == 'ALERTA' %}⚠
+        {% else %}✖
+        {% endif %}
+    </div>
+
+    <div class="info">
+        <h3>
+            {% if resultado.status == 'OFICIAL' %}Número Oficial
+            {% elif resultado.status == 'ALERTA' %}Número com denúncias
+            {% elif resultado.status == 'CANAIS' %}Canais oficiais
+            {% else %}Número não oficial
             {% endif %}
-        </article>
-    {% endif %}
+        </h3>
+        <p><strong>Status:</strong> {{ resultado.status }}</p>
+        {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
+        <p>{{ resultado.mensagem }}</p>
+
+        <div class="colunas">
+            {% if resultado.telefones %}
+            <div class="coluna">
+                <strong>📞 Telefones</strong>
+                <ul>
+                    {% for tel in resultado.telefones %}<li>{{ tel }}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if resultado.emails %}
+            <div class="coluna">
+                <strong>📧 Emails</strong>
+                <ul>
+                    {% for email in resultado.emails %}<li>{{ email }}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if resultado.denuncias %}
+        <div style="margin-top: 15px;">
+            <strong>🚨 Denúncias</strong>
+            <ul>
+                {% for d in resultado.denuncias %}<li>{{ d.tipo }} - {{ d.descricao }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
