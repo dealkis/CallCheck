@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <h1>Entre em contato</h1>
+    <p>Dúvidas, sugestões ou solicitações de parceria empresarial.</p>
+</section>
+
+<div class="resultado" style="flex-direction: column; width: 450px;">
+    <div class="info">
+        <h3>Envie uma mensagem</h3>
+        <form class="form-box" style="display: flex; flex-direction: column; width: 100%;">
+            <input type="text" name="nome" placeholder="👤 Seu nome" required style="width: 90%;">
+            <input type="email" name="email" placeholder="📧 Seu e-mail" required style="width: 90%;">
+            
+            <select name="assunto" style="padding: 10px; margin: 10px; width: 95%; border-radius: 5px; border: 1px solid #ccc;">
+                <option value="duvida">Dúvida Geral</option>
+                <option value="parceria">Sou uma Empresa (Parceria)</option>
+                <option value="denuncia">Reportar erro de dados</option>
+            </select>
+
+            <textarea name="mensagem" placeholder="📝 Como podemos ajudar?" style="padding: 10px; margin: 10px; width: 90%; height: 100px; border-radius: 5px; border: 1px solid #ccc; font-family: Arial;"></textarea>
+            
+            <button type="submit" style="background: #000; color: #fff; border: none; border-radius: 5px; margin-top: 10px;">Enviar Mensagem</button>
+        </form>
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 20px;">
+    <p>Ou envie um e-mail direto para: <strong>contato@callcheck.com.br</strong></p>
+</div>
+{% endblock %}
