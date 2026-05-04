@@ -99,12 +99,10 @@ def login():
 def sobre():
     return render_template("sobre.html")
 
-@app.route("/contato", methods=["GET", "POST"])
+@app.route("/contato")
 def contato():
-    if request.method == "POST":
-        # Simulamos que os dados foram processados sem precisar do SQL agora
-        return render_template("contato.html", sucesso=True)
-    return render_template("contato.html")
+    sucesso_envio = request.args.get('enviado') == 'true'
+    return render_template("contato.html", sucesso_envio=sucesso_envio)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
