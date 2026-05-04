@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <article style="max-width: 400px; margin: auto;">
+        <h2>Login</h2>
+        <form>
+            <label>Usuário</label>
+            <input type="text" name="user" placeholder="Seu usuário">
+            
+            <label>Senha</label>
+            <input type="password" name="password" placeholder="********">
+            
+            <button type="submit">Entrar</button>
+        </form>
+    </article>
+{% endblock %}
