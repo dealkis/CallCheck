@@ -33,7 +33,16 @@
         <a href="{{ url_for('sobre') }}">Sobre</a>
         <a href="{{ url_for('contato') }}">Contato</a>
     </nav>
-    <a href="{{ url_for('login') }}" class="login-btn">Login</a>
+
+    <!-- ÁREA ALTERADA: MENU DINÂMICO -->
+    {% if session.get('usuario_logado') %}
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="{{ url_for('perfil_usuario') }}" style="text-decoration: none; color: #007bff; font-weight: bold;">Minha Área</a>
+            <a href="{{ url_for('logout') }}" class="login-btn" style="background: #d9534f;">Sair</a>
+        </div>
+    {% else %}
+        <a href="{{ url_for('login') }}" class="login-btn">Login</a>
+    {% endif %}
 </header>
 
 {% block content %}{% endblock %}
