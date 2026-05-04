@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <h1>Bem-vindo, Administrador</h1>
+    <p>Você está conectado ao painel de controle do CallCheck.</p>
+</section>
+
+<div class="resultado" style="width: 80%; margin: 0 auto; padding: 20px;">
+    <div class="info" style="background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <h2>Painel do Usuário (ACEX)</h2>
+        <hr>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h3>📊 Estatísticas</h3>
+                <p>Consultas realizadas hoje: <strong>12</strong></p>
+                <p>Números denunciados: <strong>5</strong></p>
+            </div>
+            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h3>⚙️ Configurações</h3>
+                <p>Alterar senha</p>
+                <p>Gerenciar notificações</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: center;">
+            <a href="/login" style="color: #d9534f; font-weight: bold; text-decoration: none; border: 1px solid #d9534f; padding: 10px 20px; border-radius: 5px;">Sair do Sistema</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
