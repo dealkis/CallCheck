@@ -100,7 +100,7 @@ def sobre():
     return render_template("sobre.html")
 
 @app.route("/contato")
-def sobre():
+def contato():
     return render_template("contato.html")
 
 if __name__ == "__main__":
