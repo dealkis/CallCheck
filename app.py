@@ -101,8 +101,7 @@ def sobre():
 
 @app.route("/contato")
 def contato():
-    sucesso_envio = request.args.get('enviado') == 'true'
-    return render_template("contato.html", sucesso_envio=sucesso_envio)
+    return render_template("contato.html")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
