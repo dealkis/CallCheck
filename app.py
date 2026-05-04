@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, url_for, redirect
 import mysql.connector
 import os
 
+
 app = Flask(__name__)
 
 # =========================
@@ -94,12 +95,19 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = None
-    if request.method == "POST":
-        # Como o SQL está fora, qualquer tentativa resultará em erro
-        # No futuro, aqui entrará a lógica de consultar o banco
-        erro = "Usuário não encontrado ou senha incorreta."
+    sucesso = None
     
-    return render_template("login.html", erro=erro)
+    if request.method == "POST":
+        usuario_digitado = request.form.get("usuario")
+        senha_digitada = request.form.get("senha")
+
+        # Lógica de teste sem banco de dados
+        if usuario_digitado == "admin" and senha_digitada == "123":
+            sucesso = "Login realizado com sucesso! Bem-vindo ao painel ACEX."
+        else:
+            erro = "Usuário não encontrado ou senha incorreta."
+    
+    return render_template("login.html", erro=erro, sucesso=sucesso)
 
 @app.route("/sobre")
 def sobre():
