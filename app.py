@@ -99,8 +99,8 @@ def login():
         usuario_digitado = request.form.get("usuario")
         senha_digitada = request.form.get("senha")
 
-        # Simulação de login
         if usuario_digitado == "admin" and senha_digitada == "123":
+            session.permanent = True # Faz a sessão durar mais tempo
             session["usuario_logado"] = usuario_digitado
             return redirect(url_for('perfil_usuario'))
         else:
