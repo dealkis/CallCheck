@@ -34,10 +34,13 @@
         <a href="{{ url_for('contato') }}">Contato</a>
     </nav>
 
-    <!-- ÁREA ALTERADA: MENU DINÂMICO -->
+<!-- MENU DINÂMICO COM NOME DO USUÁRIO -->
     {% if session.get('usuario_logado') %}
         <div style="display: flex; align-items: center; gap: 15px;">
-            <a href="{{ url_for('perfil_usuario') }}" style="text-decoration: none; color: #007bff; font-weight: bold;">Minha Área</a>
+            <!-- Aqui mudamos de 'Minha Área' para o nome do usuário -->
+            <a href="{{ url_for('perfil_usuario') }}" style="text-decoration: none; color: #007bff; font-weight: bold;">
+                Olá, {{ session['usuario_logado'] }}
+            </a>
             <a href="{{ url_for('logout') }}" class="login-btn" style="background: #d9534f;">Sair</a>
         </div>
     {% else %}
