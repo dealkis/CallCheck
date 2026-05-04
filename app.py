@@ -4,7 +4,7 @@ import os
 
 
 app = Flask(__name__)
-app.secret_key = "chave de segurança" # Escolha qualquer frase aqui
+app.secret_key = "chave_segura_acex" # Escolha qualquer frase aqui
 # =========================
 # CONFIGURAÇÃO DE CONEXÃO (Seu código original)
 # =========================
