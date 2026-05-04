@@ -101,7 +101,7 @@ def sobre():
 
 @app.route("/contato")
 def contato():
-    sucesso_envio = request.args.get('enviado') == 'true'
+    sucesso_envio = request.args.get('Thanks!') == 'true'
     return render_template("contato.html", sucesso_envio=sucesso_envio)
 
 if __name__ == "__main__":
