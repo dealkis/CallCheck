@@ -1,10 +1,10 @@
-from flask import Flask, render_template, request, url_for, redirect
+from flask import Flask, render_template, request, url_for, redirect, session
 import mysql.connector
 import os
 
 
 app = Flask(__name__)
-
+app.secret_key = "chave de segurança" # Escolha qualquer frase aqui
 # =========================
 # CONFIGURAÇÃO DE CONEXÃO (Seu código original)
 # =========================
@@ -99,9 +99,8 @@ def login():
         usuario_digitado = request.form.get("usuario")
         senha_digitada = request.form.get("senha")
 
-        # Simulação de banco de dados
         if usuario_digitado == "admin" and senha_digitada == "123":
-            # Redireciona para a função 'perfil_usuario' abaixo
+            session["usuario_logado"] = usuario_digitado # Salva na sessão
             return redirect(url_for('perfil_usuario'))
         else:
             erro = "Usuário não encontrado ou senha incorreta."
@@ -111,8 +110,15 @@ def login():
 # Nova rota para a página do usuário logado
 @app.route("/usuario")
 def perfil_usuario():
-    return render_template("usuario.html")
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
 
+@app.route("/logout")
+def logout():
+    session.pop("usuario_logado", None) # Remove o usuário da sessão
+    return redirect(url_for('login'))
+        
+    return render_template("usuario.html")
 @app.route("/sobre")
 def sobre():
     return render_template("sobre.html")
