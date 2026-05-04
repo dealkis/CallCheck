@@ -91,9 +91,15 @@ def index():
         resultado = verificar_empresa(nome_empresa, numero_tel)
     return render_template("index.html", resultado=resultado)
 
-@app.route("/login")
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    return render_template("login.html")
+    erro = None
+    if request.method == "POST":
+        # Como o SQL está fora, qualquer tentativa resultará em erro
+        # No futuro, aqui entrará a lógica de consultar o banco
+        erro = "Usuário não encontrado ou senha incorreta."
+    
+    return render_template("login.html", erro=erro)
 
 @app.route("/sobre")
 def sobre():
