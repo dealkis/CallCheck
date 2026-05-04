@@ -94,6 +94,10 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # Se o cara já está logado e tentou entrar na página de login, manda ele pra área dele
+    if "usuario_logado" in session:
+        return redirect(url_for('perfil_usuario'))
+        
     erro = None
     if request.method == "POST":
         usuario_digitado = request.form.get("usuario")
