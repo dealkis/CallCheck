@@ -351,3 +351,68 @@ def editar_empresa(id):
 
     conn.close()
     return render_template("editar_empresa.html", empresa=empresa)
+
+@app.route("/admin/empresa/<int:id>", methods=["GET", "POST"])
+def gerenciar_empresa(id):
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    # =========================
+    # EDITAR NOME
+    # =========================
+    if request.method == "POST":
+        acao = request.form.get("acao")
+
+        if acao == "editar_nome":
+            novo_nome = request.form.get("nome")
+            cursor.execute(
+                "UPDATE empresa SET nome = %s WHERE id = %s",
+                (novo_nome, id)
+            )
+
+        # =========================
+        # ADICIONAR TELEFONE
+        # =========================
+        elif acao == "add_telefone":
+            telefone = request.form.get("telefone")
+            telefone = ''.join(filter(str.isdigit, telefone))
+
+            cursor.execute(
+                "INSERT INTO telefone (empresa_id, numero) VALUES (%s, %s)",
+                (id, telefone)
+            )
+
+        # =========================
+        # EXCLUIR TELEFONE
+        # =========================
+        elif acao == "excluir_telefone":
+            tel_id = request.form.get("tel_id")
+            cursor.execute("DELETE FROM telefone WHERE id = %s", (tel_id,))
+
+        # =========================
+        # EXCLUIR EMPRESA
+        # =========================
+        elif acao == "excluir_empresa":
+            cursor.execute("DELETE FROM telefone WHERE empresa_id = %s", (id,))
+            cursor.execute("DELETE FROM empresa WHERE id = %s", (id,))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('listar_empresas'))
+
+        conn.commit()
+
+    # =========================
+    # BUSCAR DADOS
+    # =========================
+    cursor.execute("SELECT * FROM empresa WHERE id = %s", (id,))
+    empresa = cursor.fetchone()
+
+    cursor.execute("SELECT * FROM telefone WHERE empresa_id = %s", (id,))
+    telefones = cursor.fetchall()
+
+    conn.close()
+
+    return render_template("empresa_detalhe.html", empresa=empresa, telefones=telefones)
