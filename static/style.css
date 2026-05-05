@@ -47,3 +47,42 @@ button {
 .icone {
     font-size: 30px;
 }
+/* Configurações para Mobile */
+@media (max-width: 768px) {
+    /* Ajusta a largura das seções principais */
+    .resultado, .info, .form-box {
+        width: 95% !important; /* Ocupa quase toda a largura da tela */
+        margin: 10px auto !important;
+        padding: 15px !important;
+    }
+
+    /* No usuario.html, transforma as duas colunas em uma só (estatística e pesquisa) */
+    div[style*="display: grid"] {
+        grid-template-columns: 1fr !important; /* Coloca um bloco embaixo do outro */
+        gap: 15px !important;
+    }
+
+    /* Ajusta o título para não ficar gigante no celular */
+    .hero h1 {
+        font-size: 1.5rem !important;
+        padding: 0 10px;
+    }
+
+    /* Faz o histórico ocupar a tela toda e ajusta o texto */
+    li[style*="display: flex"] {
+        flex-direction: column; /* No celular, o status fica embaixo do número */
+        align-items: flex-start !important;
+        gap: 10px;
+    }
+
+    /* Ajusta o modal (pop-up) para não ficar apertado */
+    .modal-box {
+        width: 85% !important;
+    }
+
+    /* Ajusta os botões para serem mais fáceis de clicar com o dedo */
+    button, .login-btn {
+        width: 100% !important;
+        height: 50px; /* Botão maior para o toque */
+    }
+}
