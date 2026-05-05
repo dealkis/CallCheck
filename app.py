@@ -263,3 +263,13 @@ def criar_banco():
     conn.close()
 
     return "Banco criado!"
+#-----------------#
+#-----------------#
+#-----------------#
+#-----------------#
+@app.route("/teste")
+def teste():
+    conn = conectar()
+    if conn:
+        return "Conectado com sucesso!"
+    return "Erro ao conectar"
