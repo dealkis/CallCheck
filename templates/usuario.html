@@ -31,24 +31,40 @@
                 <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">Pesquise por um destes campos ou preencha ambos:</p>
                 
                <form id="formPesquisa" method="POST" class="form-box">
+                    <!-- Campo Empresa -->
                     <input type="text" id="nome" name="nome" placeholder="🏢 Nome da empresa">
+                    
+                    <!-- Campo Telefone -->
                     <input type="text" id="telefone" name="telefone" placeholder="📞 Telefone">
+                
+                    <!-- AVISO GENTIL (Invisível por padrão) -->
+                    <p id="avisoErro" style="display: none; color: #d93025; font-size: 0.9em; margin: 0; font-weight: bold;">
+                        ⚠️ Por favor, preencha o nome ou o telefone.
+                    </p>
+                    
                     <button type="button" onclick="validarBusca()">Verificar</button>
                 </form>
-                
-                <script>
-                function validarBusca() {
-                    var nome = document.getElementById('nome').value.trim();
-                    var telefone = document.getElementById('telefone').value.trim();
-                
-                    if (nome === "" && telefone === "") {
-                        alert("Ops! Informe pelo menos o nome ou o telefone para continuar.");
-                    } else {
-                        document.getElementById('formPesquisa').submit();
-                    }
-                }
-                </script>
-                    
+                    <script>
+                        function validarBusca() {
+                            var nomeInput = document.getElementById('nome');
+                            var telefoneInput = document.getElementById('telefone');
+                            var aviso = document.getElementById('avisoErro');
+                        
+                            // Se ambos estiverem vazios
+                            if (nomeInput.value.trim() === "" && telefoneInput.value.trim() === "") {
+                                // Mostra o texto de aviso
+                                aviso.style.display = "block";
+                                
+                                // Deixa as bordas levemente vermelhas para sinalizar onde preencher
+                                nomeInput.style.border = "2px solid #d93025";
+                                telefoneInput.style.border = "2px solid #d93025";
+                            } else {
+                                // Se pelo menos um estiver preenchido, limpa os erros e envia
+                                aviso.style.display = "none";
+                                document.getElementById('formPesquisa').submit();
+                            }
+                        }
+                        </script>
                     <!-- Input Nome da Empresa
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                         <label style="font-size: 0.8em; font-weight: bold; color: #444;">Nome da Empresa:</label>
