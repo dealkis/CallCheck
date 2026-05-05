@@ -148,7 +148,7 @@ def perfil_usuario():
         telefone_digitado = request.form.get("telefone", "").strip()
 
         if nome_digitado or telefone_digitado:
-            status_simulado = "FRAUDE" if telefone_digitado.startswith("11") else "OFICIAL"
+            status_simulado = "Não Oficial" if telefone_digitado.startswith("(11)") else "OFICIAL"
             
             resultado_local = {
                 "empresa": nome_digitado if nome_digitado else "Não informada",
