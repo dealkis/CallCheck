@@ -69,14 +69,17 @@
                 <small style="color: #666;"><strong>Empresa:</strong> {{ item.empresa }}</small>
             </div>
             
-            <div style="text-align: right;">
-                <!-- COR DINÂMICA DA ETIQUETA (BADGE) -->
-                <span style="background: {% if item.status == 'OFICIAL' %}#d4edda{% else %}#f8d7da{% endif %}; 
-                             color: {% if item.status == 'OFICIAL' %}#155724{% else %}#721c24{% endif %}; 
-                             padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold;">
-                    {{ item.status }}
-                </span>
-            </div>
+            <div class="status-container" style="min-width: 100px;">
+    <span style="background: {% if item.status == 'OFICIAL' %}#d4edda{% else %}#f8d7da{% endif %}; 
+                 color: {% if item.status == 'OFICIAL' %}#155724{% else %}#721c24{% endif %}; 
+                 padding: 5px 12px; 
+                 border-radius: 20px; 
+                 font-size: 0.85em; 
+                 font-weight: bold;
+                 display: inline-block;">
+        {{ item.status }}
+    </span>
+</div>
         </li>
     {% endfor %}
 </ul>
