@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 import mysql.connector
+import psycopg2
 import os
 #-----------------#
 #-----------------#
@@ -14,16 +15,16 @@ app.secret_key = "chave_segura_acex"
 # CONFIGURAÇÃO DE CONEXÃO#
 def conectar():
     try:
-        return mysql.connector.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            user=os.getenv("DB_USER", "root"),
-            password=os.getenv("DB_PASSWORD", ""),
-            database=os.getenv("DB_NAME", "callcheck"),
-            port=int(os.getenv("DB_PORT", 3306))
+        return psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            port=os.getenv("DB_PORT")
         )
     except Exception as e:
-        print(f"Erro ao conectar ao banco: {e}")
-        return None  
+        print("Erro ao conectar:", e)
+        return None 
 #-----------------#
 #-----------------#
 #-----------------#
@@ -230,3 +231,35 @@ if __name__ == "__main__":
 #-----------------#
 #-----------------#
 #-----------------#
+@app.route("/criar-banco")
+def criar_banco():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS empresa (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS telefone (
+        id SERIAL PRIMARY KEY,
+        empresa_id INT REFERENCES empresa(id),
+        numero VARCHAR(20)
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS denuncia (
+        id SERIAL PRIMARY KEY,
+        telefone_id INT REFERENCES telefone(id),
+        tipo VARCHAR(100)
+    );
+    """)
+
+    conn.commit()
+    conn.close()
+
+    return "Banco criado!"
