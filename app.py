@@ -125,10 +125,13 @@ def login():
 
 @app.route("/usuario")
 def perfil_usuario():
+    # Proteção de acesso
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
-        
-    return render_template("usuario.html")
+    # Puxa o histórico da sessão (ou lista vazia se não tiver nada ainda)
+    pesquisas = session.get('pesquisas_recentes', [])
+    # Envia a variável 'pesquisas' para o HTML
+    return render_template("usuario.html", pesquisas=pesquisas)
 
 @app.route("/logout")
 def logout():
