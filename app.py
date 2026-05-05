@@ -324,3 +324,30 @@ def excluir_empresa(id):
     conn.close()
 
     return redirect(url_for('listar_empresas'))
+
+@app.route("/admin/editar/<int:id>", methods=["GET", "POST"])
+def editar_empresa(id):
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        novo_nome = request.form.get("nome")
+
+        cursor.execute(
+            "UPDATE empresa SET nome = %s WHERE id = %s",
+            (novo_nome, id)
+        )
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('listar_empresas'))
+
+    # GET (carregar dados)
+    cursor.execute("SELECT * FROM empresa WHERE id = %s", (id,))
+    empresa = cursor.fetchone()
+
+    conn.close()
+    return render_template("editar_empresa.html", empresa=empresa)
