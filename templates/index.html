@@ -3,7 +3,14 @@
 {% block content %}
 <section class="hero">
     <h1>Verifique o número de telefone da empresa</h1>
-    <!-- Removido o 'required' para permitir flexibilidade na pesquisa -->
+    
+    <!-- MENSAGEM DE ERRO CASO ENVIE VAZIO -->
+    {% if erro_formulario %}
+        <p style="color: #ff4d4d; background: #ffe6e6; padding: 10px; border-radius: 5px; display: inline-block; font-weight: bold;">
+            {{ erro_formulario }}
+        </p>
+    {% endif %}
+
     <form method="POST" class="form-box">
         <input type="text" name="nome" placeholder="🏢 Nome da empresa">
         <input type="text" name="telefone" placeholder="📞 Telefone">
