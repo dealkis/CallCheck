@@ -80,25 +80,33 @@ def verificar_empresa(nome, telefone=None):
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
-    if request.method == "POST":
-        numero_pesquisado = request.form.get("numero", "")
-        empresa_pesquisada = request.form.get("nome_empresa", "")
+    erro_formulario = None # Variável para guardar o erro de campo vazio
 
-        # LÓGICA DE SIMULAÇÃO: Se começar com 11, é Suspeito
-        # Usamos .strip() para remover espaços acidentais
-        if numero_pesquisado.strip().startswith("11"):
-            status_resultado = "Suspeito"
+    if request.method == "POST":
+        nome_digitado = request.form.get("nome", "").strip()
+        telefone_digitado = request.form.get("telefone", "").strip()
+
+        # VALIDAÇÃO: Se o usuário não digitou NADA em nenhum dos campos
+        if not nome_digitado and not telefone_digitado:
+            erro_formulario = "Por favor, informe pelo menos o nome da empresa ou um telefone."
+            return render_template("index.html", erro_formulario=erro_formulario)
+
+        # Lógica de status (Sincronizada com o que você já usa)
+        if telefone_digitado.startswith("11"):
+            status_simulado = "FRAUDE"
+            mensagem_simulada = "Este número possui características de atividades fraudulentas."
         else:
-            status_resultado = "Seguro"
+            status_simulado = "OFICIAL"
+            mensagem_simulada = "Este é um canal verificado e seguro para contato."
 
         resultado = {
-            "numero": numero_pesquisado if numero_pesquisado else "Não informado",
-            "empresa": empresa_pesquisada if empresa_pesquisada else "Não informada",
-            "status": status_resultado
+            "empresa": nome_digitado if nome_digitado else "Não informada",
+            "telefone": telefone_digitado if telefone_digitado else "Não informado",
+            "status": status_simulado,
+            "mensagem": mensagem_simulada
         }
 
-        # SALVAR NO HISTÓRICO (Mesmo que não esteja logado, ou apenas se estiver)
-        # Se quiser que salve apenas para logados, envolva em um 'if "usuario_logado" in session:'
+        # Salva no histórico da sessão
         if 'pesquisas_recentes' not in session:
             session['pesquisas_recentes'] = []
         
@@ -107,7 +115,7 @@ def index():
         session['pesquisas_recentes'] = pesquisas[:5]
         session.modified = True 
 
-    return render_template("index.html", resultado=resultado)
+    return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
