@@ -39,10 +39,9 @@ def verificar_empresa(nome=None, telefone=None):
 
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
         telefone = limpar_telefone(telefone)
 
-        # 🔍 BUSCA POR TELEFONE
+        # BUSCA POR TELEFONE
         if telefone and not nome:
             cursor.execute("""
                 SELECT e.nome, t.numero
@@ -52,7 +51,6 @@ def verificar_empresa(nome=None, telefone=None):
             """, (telefone,))
             
             resultado = cursor.fetchone()
-
             conn.close()
 
             if resultado:
@@ -72,13 +70,9 @@ def verificar_empresa(nome=None, telefone=None):
 
         empresa = None
 
-        # 🔍 BUSCA POR NOME
+        # BUSCA POR NOME
         if nome:
-            cursor.execute("""
-                SELECT * FROM empresa
-                WHERE nome ILIKE %s
-            """, (f"%{nome}%",))
-            
+            cursor.execute("SELECT * FROM empresa WHERE nome ILIKE %s", (f"%{nome}%",))
             empresa = cursor.fetchone()
 
             if not empresa:
@@ -92,11 +86,7 @@ def verificar_empresa(nome=None, telefone=None):
         telefones = []
 
         if empresa:
-            cursor.execute("""
-                SELECT id, numero FROM telefone
-                WHERE empresa_id = %s
-            """, (empresa["id"],))
-            
+            cursor.execute("SELECT id, numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
             dados_tel = cursor.fetchall()
             telefones = [limpar_telefone(t["numero"]) for t in dados_tel]
 
@@ -106,14 +96,14 @@ def verificar_empresa(nome=None, telefone=None):
             "telefone": telefone if telefone else "Não informado"
         }
 
-        # 📊 SÓ EMPRESA
+        # SÓ EMPRESA
         if nome and not telefone:
             resposta.update({
                 "status": "CANAIS",
                 "mensagem": "Canais oficiais da empresa."
             })
 
-        # 📊 EMPRESA + TELEFONE
+        # EMPRESA + TELEFONE
         elif nome and telefone:
             if telefone in telefones:
                 resposta.update({
@@ -156,7 +146,7 @@ def verificar_empresa(nome=None, telefone=None):
         return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS
+# ROTAS PRINCIPAIS
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -175,7 +165,32 @@ def index():
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
 # =========================
-# LOGIN
+# USUÁRIO
+# =========================
+@app.route("/usuario", methods=["GET", "POST"])
+def perfil_usuario():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    resultado_local = None
+
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        telefone = request.form.get("telefone", "").strip()
+
+        if nome or telefone:
+            resultado_local = verificar_empresa(nome, telefone)
+
+            pesquisas = session.get('pesquisas_recentes', [])
+            pesquisas.insert(0, resultado_local)
+            session['pesquisas_recentes'] = pesquisas[:5]
+            session.modified = True
+
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("usuario.html", pesquisas=pesquisas, resultado_modal=resultado_local)
+
+# =========================
+# LOGIN / LOGOUT
 # =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -193,15 +208,35 @@ def login():
 
     return render_template("login.html", erro=erro)
 
+@app.route("/logout")
+def logout():
+    session.pop("usuario_logado", None)
+    return redirect(url_for('login'))
+
 # =========================
-# PROTEÇÃO SIMPLES
+# PÁGINAS
+# =========================
+@app.route("/sobre")
+def sobre():
+    return render_template("sobre.html")
+
+@app.route("/contato")
+def contato():
+    return render_template("contato.html")
+
+@app.route("/historico")
+def historico():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("historico.html", pesquisas=pesquisas)
+
+# =========================
+# ADMIN (PROTEGER!)
 # =========================
 def proteger():
     return "usuario_logado" in session
 
-# =========================
-# ROTAS ADMIN (PROTEGIDAS)
-# =========================
 @app.route("/add-empresa")
 def add_empresa():
     if not proteger():
@@ -209,9 +244,15 @@ def add_empresa():
 
     conn = conectar()
     cursor = conn.cursor()
-
     cursor.execute("INSERT INTO empresa (nome) VALUES ('Banco do Brasil')")
     conn.commit()
     conn.close()
 
     return "Empresa adicionada!"
+
+# =========================
+# FINAL
+# =========================
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
