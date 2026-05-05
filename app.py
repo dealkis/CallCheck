@@ -23,20 +23,58 @@ def conectar():
 def verificar_empresa(nome, telefone=None):
     conn = conectar()
     
-    # Se não houver banco, retorna simulação mas com a chave 'telefone'
+    # --- BLOCO DE SUBSTITUIÇÃO (MODO DEMO) ---
     if conn is None:
-        return {
-            "empresa": nome if nome else "Empresa Demo",
-            "telefone": telefone if telefone else "Não informado",
-            "telefones": ["(11) 4004-0000", "(11) 99999-9999"],
-            "emails": ["contato@exemplo.com"],
-            "status": "CANAIS" if not telefone else "OFICIAL",
-            "mensagem": "Nota: Modo de demonstração (Banco offline)."
+        nome_busca = nome.lower() if nome else ""
+        
+        # Simulamos nosso "banco de dados" aqui dentro
+        banco_demo = {
+            "magalu": {
+                "nome": "Magazine Luiza (Magalu)",
+                "telefones": ["(11) 4004-4808", "(11) 99999-0000"],
+                "emails": ["atendimento@magalu.com.br"]
+            },
+            "nubank": {
+                "nome": "Nubank",
+                "telefones": ["0800 608 6236"],
+                "emails": ["meajuda@nubank.com.br"]
+            }
         }
 
+        # Tenta encontrar a empresa no banco demo
+        dados = None
+        for chave in banco_demo:
+            if chave in nome_busca:
+                dados = banco_demo[chave]
+                break
+
+        if not dados:
+            return {"status": "ERRO", "mensagem": "Empresa não encontrada (Modo Demo)."}
+
+        resposta = {
+            "empresa": dados["nome"],
+            "telefones": dados["telefones"],
+            "emails": dados["emails"],
+            "telefone": telefone if telefone else "Não informado"
+        }
+
+        # Lógica para os 3 cenários de teste:
+        if not telefone or telefone.strip() == "":
+            # CENÁRIO 1: Só pesquisou o nome
+            resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais encontrados."})
+        elif telefone in dados["telefones"]:
+            # CENÁRIO 2: Empresa cadastrada e telefone CORRETO
+            resposta.update({"status": "OFICIAL", "mensagem": "Número verificado e seguro."})
+        else:
+            # CENÁRIO 3: Empresa cadastrada, mas telefone DIFERENTE
+            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Atenção: Este número não é oficial desta empresa."})
+
+        return resposta
+    # --- FIM DO BLOCO DE SUBSTITUIÇÃO ---
+
+    # Daqui para baixo é o seu código ORIGINAL para quando o banco existir
     try:
         cursor = conn.cursor(dictionary=True)
-        # Busca aproximada pelo nome
         cursor.execute("SELECT * FROM empresa WHERE nome LIKE %s", (f"%{nome}%",))
         empresa = cursor.fetchone()
 
@@ -44,15 +82,13 @@ def verificar_empresa(nome, telefone=None):
             conn.close()
             return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base oficial."}
 
-        # Busca telefones vinculados
         cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
         telefones = [t["numero"] for t in cursor.fetchall()]
-        emails = ["atendimento@oficial.com.br"]
-
+        
         resposta = {
             "empresa": empresa["nome"], 
             "telefones": telefones, 
-            "emails": emails,
+            "emails": ["atendimento@oficial.com.br"],
             "telefone": telefone if telefone else "Não informado"
         }
 
