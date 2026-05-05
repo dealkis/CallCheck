@@ -79,31 +79,35 @@ def verificar_empresa(nome, telefone=None):
 # ROTAS DO SITE
 @app.route("/", methods=["GET", "POST"])
 def index():
+    resultado = None
     if request.method == "POST":
-        # Captura os dois campos do formulário
-        numero_pesquisado = request.form.get("numero")
-        empresa_pesquisada = request.form.get("nome_empresa")
-        
-        # Cria o registro para o histórico
-        # Se um campo estiver vazio, usamos "Não informado"
-        resultado_simulado = {
-            "numero": numero_pesquisado if numero_pesquisado else "---",
-            "empresa": empresa_pesquisada if empresa_pesquisada else "---",
-            "status": "Seguro" # Aqui viria sua lógica real de verificação
+        numero_pesquisado = request.form.get("numero", "")
+        empresa_pesquisada = request.form.get("nome_empresa", "")
+
+        # LÓGICA DE SIMULAÇÃO: Se começar com 11, é Suspeito
+        # Usamos .strip() para remover espaços acidentais
+        if numero_pesquisado.strip().startswith("11"):
+            status_resultado = "Suspeito"
+        else:
+            status_resultado = "Seguro"
+
+        resultado = {
+            "numero": numero_pesquisado if numero_pesquisado else "Não informado",
+            "empresa": empresa_pesquisada if empresa_pesquisada else "Não informada",
+            "status": status_resultado
         }
 
-        # Salva no histórico da sessão
+        # SALVAR NO HISTÓRICO (Mesmo que não esteja logado, ou apenas se estiver)
+        # Se quiser que salve apenas para logados, envolva em um 'if "usuario_logado" in session:'
         if 'pesquisas_recentes' not in session:
             session['pesquisas_recentes'] = []
-
+        
         pesquisas = session['pesquisas_recentes']
-        pesquisas.insert(0, resultado_simulado)
+        pesquisas.insert(0, resultado)
         session['pesquisas_recentes'] = pesquisas[:5]
         session.modified = True 
 
-        return render_template("index.html", resultado=resultado_simulado)
-        
-    return render_template("index.html")
+    return render_template("index.html", resultado=resultado)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
