@@ -22,66 +22,41 @@ def conectar():
 # LÓGICA DE VERIFICAÇÃO (MELHORADA)
 def verificar_empresa(nome, telefone=None):
     conn = conectar()
-    
-    # --- MODO DEMO MELHORADO (Busca por Nome ou Telefone) ---
+
+    # Se não houver banco, retorna simulação mas com a chave 'telefone'
     if conn is None:
-        nome_busca = nome.lower().strip() if nome else ""
-        tel_busca = telefone.strip() if telefone else ""
+        return {
+            "empresa": nome if nome else "Empresa Demo",
+            "telefone": telefone if telefone else "Não informado",
+            "telefones": ["(11) 4004-0000", "(11) 99999-9999"],
+            "emails": ["contato@exemplo.com"],
+            "status": "CANAIS" if not telefone else "OFICIAL",
+            "mensagem": "Nota: Modo de demonstração (Banco offline)."
+               }
+
+           try:
+        cursor = conn.cursor(dictionary=True)
+        # Busca aproximada pelo nome
+        cursor.execute("SELECT * FROM empresa WHERE nome LIKE %s", (f"%{nome}%",))
+        empresa = cursor.fetchone()
+
+        if not empresa:
+            conn.close()
+            return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base oficial."}
+
+        # Busca telefones vinculados
+        cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
+        telefones = [t["numero"] for t in cursor.fetchall()]
+        emails = ["atendimento@oficial.com.br"]
+
         
-        banco_demo = {
-            "magalu": {
-                "nome": "Magazine Luiza (Magalu)",
-                "telefones": ["(11) 4004-4808", "(11) 99999-0000"],
-                "emails": ["atendimento@magalu.com.br"]
-            },
-            "nubank": {
-                "nome": "Nubank",
-                "telefones": ["0800 608 6236"],
-                "emails": ["meajuda@nubank.com.br"]
-            }
-        }
-
-        dados = None
-        # 1. Tenta buscar primeiro pelo TELEFONE (se informado)
-        if tel_busca:
-            for chave in banco_demo:
-                if tel_busca in banco_demo[chave]["telefones"]:
-                    dados = banco_demo[chave]
-                    break
-        
-        # 2. Se não achou pelo telefone, tenta pelo NOME (se informado)
-        if not dados and nome_busca:
-            for chave in banco_demo:
-                if chave in nome_busca:
-                    dados = banco_demo[chave]
-                    break
-
-        # Se não achou em nenhum dos dois casos
-        if not dados:
-            return {"status": "ERRO", "mensagem": "Nenhum registro encontrado com esses dados."}
-
-        # Preparar a resposta
         resposta = {
-            "empresa": dados["nome"],
-            "telefones": dados["telefones"],
-            "emails": dados["emails"],
-            "telefone": tel_busca if tel_busca else "Não informado"
+            "empresa": empresa["nome"], 
+            "telefones": telefones, 
+            "emails": emails,
+            "telefone": telefone if telefone else "Não informado"
         }
 
-        # Lógica de Status Baseada na Busca
-        if not tel_busca:
-            # Pesquisou só por nome
-            resposta.update({"status": "CANAIS", "mensagem": "Exibindo canais oficiais da empresa."})
-        elif tel_busca in dados["telefones"]:
-            # O telefone pesquisado é um dos oficiais
-            resposta.update({"status": "OFICIAL", "mensagem": "Este número é oficial e seguro."})
-        else:
-            # Achou a empresa pelo nome, mas o telefone informado é diferente
-            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Atenção: Este número NÃO pertence aos canais oficiais."})
-
-        return resposta
-
-        
         # Lógica de Status
         if not telefone or telefone.strip() == "":
             resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais registrados."})
@@ -126,7 +101,7 @@ def index():
             # Salva no histórico da sessão
             if 'pesquisas_recentes' not in session:
                 session['pesquisas_recentes'] = []
-            
+
             pesquisas = session['pesquisas_recentes']
             pesquisas.insert(0, resultado)
             session['pesquisas_recentes'] = pesquisas[:5]
@@ -138,7 +113,7 @@ def index():
 def perfil_usuario():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
-        
+
     resultado_local = None
 
     if request.method == "POST":
@@ -151,7 +126,7 @@ def perfil_usuario():
 
             if 'pesquisas_recentes' not in session:
                 session['pesquisas_recentes'] = []
-            
+
             pesquisas = session['pesquisas_recentes']
             pesquisas.insert(0, resultado_local)
             session['pesquisas_recentes'] = pesquisas[:5]
