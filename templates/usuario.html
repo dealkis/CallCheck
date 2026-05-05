@@ -31,6 +31,14 @@
                 <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">Pesquise por um destes campos ou preencha ambos:</p>
                 
                <form action="{{ url_for('perfil_usuario') }}" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
+                    
+                    <!-- Input Nome da Empresa -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #444;">Nome da Empresa:</label>
+                        <input type="text" name="nome" placeholder="Ex: Banco, Loja ou Prestador" required
+                               style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+                    </div>
+                   
                     <!-- Input Telefone -->
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                         <label style="font-size: 0.8em; font-weight: bold; color: #444;">Telefone:</label>
@@ -38,12 +46,7 @@
                                style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
                     </div>
 
-                    <!-- Input Nome da Empresa -->
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 0.8em; font-weight: bold; color: #444;">Nome da Empresa:</label>
-                        <input type="text" name="nome" placeholder="Ex: Banco, Loja ou Prestador" required
-                               style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
-                    </div>
+                    
                     
                     <button type="submit" style="background: #000; color: #fff; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 5px; transition: 0.3s;">
                         Verificar Agora
