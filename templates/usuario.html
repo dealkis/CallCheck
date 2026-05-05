@@ -2,28 +2,61 @@
 
 {% block content %}
 <section class="hero">
-    <!-- O Flask busca automaticamente na sessão se você usar 'session' -->
     <h1>Bem-vindo, {{ session['usuario_logado'] }}!</h1>
-    <p>Você está conectado com privilégios de Administrador.</p>
+    <p>Você está conectado ao painel de controle do CallCheck.</p>
 </section>
 
-<div class="resultado" style="width: 80%; margin: 0 auto; padding: 20px;">
-    <div class="info" style="background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-        <h2>Painel do Usuário (ACEX)</h2>
-        <hr>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                <h3>📊 Estatísticas</h3>
+<div class="resultado" style="flex-direction: column; width: 80%; margin: 0 auto; padding: 20px;">
+    <div class="info" style="background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
+        
+        <h2 style="margin-top: 0;">Painel Geral</h2>
+        <hr style="border: 0; border-top: 1px solid #ddd; margin-bottom: 20px;">
+        
+        <!-- PARTE SUPERIOR: Estatísticas e Fazer Pesquisa -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            
+            <!-- Bloco 1: Estatísticas -->
+            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fafafa;">
+                <h3 style="margin-top: 0;">📊 Estatísticas</h3>
                 <p>Consultas realizadas hoje: <strong>12</strong></p>
                 <p>Números denunciados: <strong>5</strong></p>
             </div>
-            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                <h3>⚙️ Configurações</h3>
-                <p>Alterar senha</p>
-                <p>Gerenciar notificações</p>
+
+            <!-- Bloco 2: Pesquisa Rápida -->
+            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fff;">
+                <h3 style="margin-top: 0;">🔍 Nova Verificação</h3>
+                <!-- O action="/" manda a pesquisa para a rota principal do site -->
+                <form action="/" method="POST" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                    <input type="text" name="numero" placeholder="Digite o número (Ex: 11999999999)" required style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+                    <button type="submit" style="background: #000; color: #fff; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s;">
+                        Verificar Número
+                    </button>
+                </form>
             </div>
+
         </div>
-        
+
+        <!-- PARTE INFERIOR: Histórico de Pesquisas -->
+        <div style="margin-top: 40px;">
+            <h3 style="border-bottom: 2px solid #000; display: inline-block; padding-bottom: 5px;">🕒 Histórico Recente</h3>
+            
+            {% if pesquisas %}
+                <ul style="list-style-type: none; padding: 0; margin-top: 15px;">
+                    {% for item in pesquisas %}
+                        <li style="background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid {% if item.status == 'Seguro' %}green{% else %}red{% endif %}; border: 1px solid #eee; border-left-width: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between;">
+                            <span><strong>Número:</strong> {{ item.numero }}</span>
+                            <span><strong>Empresa:</strong> {{ item.empresa }}</span>
+                            <span><strong>Status:</strong> <span style="color: {% if item.status == 'Seguro' %}green{% else %}red{% endif %}; font-weight: bold;">{{ item.status }}</span></span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div style="text-align: center; padding: 30px; color: #666; background: #f9f9f9; border-radius: 8px; margin-top: 15px; border: 1px dashed #ccc;">
+                    Nenhuma pesquisa recente encontrada no seu perfil. <br>
+                    Use o campo acima para fazer sua primeira verificação!
+                </div>
+            {% endif %}
+        </div>
 
     </div>
 </div>
