@@ -1,0 +1,19 @@
+<h2>Empresas cadastradas</h2>
+
+<table border="1">
+<tr>
+    <th>ID</th>
+    <th>Nome</th>
+    <th>Ações</th>
+</tr>
+
+{% for e in empresas %}
+<tr>
+    <td>{{ e[0] }}</td>
+    <td>{{ e[1] }}</td>
+    <td>
+        <a href="/admin/excluir/{{ e[0] }}">Excluir</a>
+    </td>
+</tr>
+{% endfor %}
+</table>
