@@ -6,13 +6,15 @@
     <p>Você está conectado ao painel de controle do CallCheck.</p>
 </section>
 
+<!-- Container Principal do Painel -->
 <div class="resultado" style="display: flex; flex-direction: column; width: 80%; margin: 20px auto; padding: 20px; border-radius: 12px; background-color: #f9f9f9; border: 1px solid #ddd;">
     
     {% if resultado %}
     <div style="text-align: center; margin-bottom: 15px;">
-        {% if resultado.telefone == "Não informado" %}
-            <h3 style="color: #2c3e50; margin: 0;">🏢 Dados da Empresa</h3>
-        {% elif resultado.status == "Oficial" %}
+        <!-- TÍTULO DINÂMICO CORRIGIDO -->
+        {% if resultado.status == "CANAIS" %}
+            <h3 style="color: #2c3e50; margin: 0;">🏢 Dados da Empresa (Canais Oficiais)</h3>
+        {% elif resultado.status == "OFICIAL" or resultado.status == "Oficial" %}
             <h3 style="color: #28a745; margin: 0;">✅ Número Oficial</h3>
         {% else %}
             <h3 style="color: #d93025; margin: 0;">✖️ Número Não Oficial</h3>
@@ -28,6 +30,7 @@
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
                 
+                <!-- Bloco de Estatísticas -->
                 <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fafafa;">
                     <h3 style="margin-top: 0;">📊 Estatísticas</h3>
                     <p>Consultas realizadas hoje: <strong>12</strong></p>
@@ -35,6 +38,7 @@
                     <p style="font-size: 0.85em; color: #666; margin-top: 15px;">Seu nível de segurança: <span style="color: green; font-weight: bold;">Alto</span></p>
                 </div>
 
+                <!-- Bloco de Pesquisa -->
                 <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fff;">
                     <h3 style="margin-top: 0;">🔍 Nova Verificação</h3>
                     <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">Pesquise por um destes campos ou preencha ambos:</p>
@@ -52,30 +56,11 @@
                         </p>
                         
                         <button type="button" onclick="validarBusca()">Verificar</button>
-                    </form> <script>
-                        function validarBusca() {
-                            var nomeInput = document.getElementById('nome');
-                            var telefoneInput = document.getElementById('telefone');
-                            var aviso = document.getElementById('avisoErro');
-                        
-                            // Se ambos estiverem vazios
-                            if (nomeInput.value.trim() === "" && telefoneInput.value.trim() === "") {
-                                // Mostra o texto de aviso
-                                aviso.style.display = "block";
-                                
-                                // Deixa as bordas levemente vermelhas para sinalizar onde preencher
-                                nomeInput.style.border = "2px solid #d93025";
-                                telefoneInput.style.border = "2px solid #d93025";
-                            } else {
-                                // Se pelo menos um estiver preenchido, limpa os erros e envia
-                                aviso.style.display = "none";
-                                document.getElementById('formPesquisa').submit();
-                            }
-                        }
-                    </script>
+                    </form>
                 </div>
             </div>
 
+            <!-- HISTÓRICO RECENTE COM CORES CORRIGIDAS -->
             <div style="margin-top: 40px;">
                 <h3 style="border-bottom: 2px solid #000; display: inline-block; padding-bottom: 5px;">🕒 Histórico Recente</h3>
                 
@@ -83,8 +68,8 @@
                     <ul style="list-style-type: none; padding: 0; margin-top: 20px;">
                         {% for item in pesquisas %}
                             <li style="background: #fff; padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #eee; 
-                                /* COR DINÂMICA DA BARRA LATERAL */
-                                border-left: 6px solid {% if item.status == 'OFICIAL' %}#28a745{% else %}#dc3545{% endif %}; 
+                                /* BARRA LATERAL DINÂMICA */
+                                border-left: 6px solid {% if item.status == 'OFICIAL' %}#28a745{% elif item.status == 'CANAIS' %}#2c3e50{% else %}#dc3545{% endif %}; 
                                 box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
                                 
                                 <div>
@@ -93,8 +78,8 @@
                                 </div>
                                 
                                 <div class="status-container" style="min-width: 100px;">
-                                    <span style="background: {% if item.status == 'OFICIAL' %}#d4edda{% else %}#f8d7da{% endif %}; 
-                                                 color: {% if item.status == 'OFICIAL' %}#155724{% else %}#721c24{% endif %}; 
+                                    <span style="background: {% if item.status == 'OFICIAL' %}#d4edda{% elif item.status == 'CANAIS' %}#e9ecef{% else %}#f8d7da{% endif %}; 
+                                                 color: {% if item.status == 'OFICIAL' %}#155724{% elif item.status == 'CANAIS' %}#2c3e50{% else %}#721c24{% endif %}; 
                                                  padding: 5px 12px; 
                                                  border-radius: 20px; 
                                                  font-size: 0.85em; 
@@ -105,48 +90,52 @@
                                 </div>
                             </li>
                         {% endfor %}
-                    </ul> {% else %}
+                    </ul> 
+                {% else %}
                     <div style="text-align: center; padding: 40px; color: #888; background: #fdfdfd; border-radius: 8px; margin-top: 20px; border: 2px dashed #eee;">
                         <p style="font-size: 1.1em; margin: 0;">Nenhuma consulta realizada recentemente.</p>
-                        <p style="font-size: 0.9em; margin-top: 5px;">Seus resultados aparecerão aqui automaticamente.</p>
                     </div>
                 {% endif %}
             </div>
-
         </div>
     </div>
-</div> <style>
-    .modal-overlay {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
-    }
-    .modal-box {
-        background: white; padding: 25px; border-radius: 12px; width: 320px; text-align: center;
-        position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: popIn 0.3s ease;
-    }
-    .close-btn {
-        position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #888; font-weight: bold;
-    }
-    @keyframes popIn {
-        from { transform: scale(0.8); opacity: 0; }
-        to { transform: scale(1); opacity: 1; }
-    }
-</style>
+</div>
 
+<!-- MODAL COM ÍCONES NEUTROS PARA CANAIS -->
 {% if resultado_modal %}
 <div class="modal-overlay" id="modalResultado">
     <div class="modal-box">
         <span class="close-btn" onclick="fecharModal()">×</span>
         
         <div style="font-size: 40px; margin-bottom: 10px;">
-            {% if resultado_modal.status == 'OFICIAL' %}✅{% else %}❌{% endif %}
+            {% if resultado_modal.status == 'CANAIS' %}
+                🏢
+            {% elif resultado_modal.status == 'OFICIAL' %}
+                ✅
+            {% else %}
+                ❌
+            {% endif %}
         </div>
         
-        <h3 style="margin-bottom: 15px;">Resultado</h3>
+        <h3 style="margin-bottom: 15px;">
+            {% if resultado_modal.status == 'CANAIS' %} Dados da Empresa {% else %} Resultado {% endif %}
+        </h3>
         <p><strong>Empresa:</strong> {{ resultado_modal.empresa }}</p>
-        <p><strong>Telefone:</strong> {{ resultado_modal.telefone }}</p>
+        
+        <!-- Mostra lista de telefones se for consulta de empresa -->
+        {% if resultado_modal.telefones %}
+            <p><strong>Canais Oficiais:</strong></p>
+            <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #555;">
+                {% for t in resultado_modal.telefones %}
+                    <li>📞 {{ t }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p><strong>Telefone:</strong> {{ resultado_modal.telefone }}</p>
+        {% endif %}
+
         <p><strong>Status:</strong> 
-            <span style="color: {% if resultado_modal.status == 'OFICIAL' %}#28a745{% else %}#dc3545{% endif %}; font-weight: bold;">
+            <span style="color: {% if resultado_modal.status == 'OFICIAL' %}#28a745{% elif resultado_modal.status == 'CANAIS' %}#2c3e50{% else %}#dc3545{% endif %}; font-weight: bold;">
                 {{ resultado_modal.status }}
             </span>
         </p>
@@ -159,32 +148,50 @@
 {% endif %}
 
 <script>
+    function validarBusca() {
+        var nomeInput = document.getElementById('nome');
+        var telefoneInput = document.getElementById('telefone');
+        var aviso = document.getElementById('avisoErro');
+        if (nomeInput.value.trim() === "" && telefoneInput.value.trim() === "") {
+            aviso.style.display = "block";
+            nomeInput.style.border = "2px solid #d93025";
+            telefoneInput.style.border = "2px solid #d93025";
+        } else {
+            aviso.style.display = "none";
+            document.getElementById('formPesquisa').submit();
+        }
+    }
+
     function fecharModal() {
         document.getElementById('modalResultado').style.display = 'none';
     }
     
-    // Fecha se clicar fora da caixa branca
     window.onclick = function(event) {
         let modal = document.getElementById('modalResultado');
-        if (event.target == modal) {
-            fecharModal();
-        }
+        if (event.target == modal) { fecharModal(); }
     }
-    // FUNÇÃO 2:
+
     function mascaraTelefone(input) {
-        let valor = input.value;
-        valor = valor.replace(/\D/g, ""); // Remove tudo que não é número
-        
+        let valor = input.value.replace(/\D/g, "");
         if (valor.length > 0) {
             valor = "(" + valor;
-            if (valor.length > 3) {
-                valor = valor.slice(0, 3) + ") " + valor.slice(3);
-            }
-            if (valor.length > 10) {
-                valor = valor.slice(0, 10) + "-" + valor.slice(10, 14);
-            }
+            if (valor.length > 3) valor = valor.slice(0, 3) + ") " + valor.slice(3);
+            if (valor.length > 10) valor = valor.slice(0, 10) + "-" + valor.slice(10, 14);
         }
         input.value = valor;
     }
 </script>
+
+<style>
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
+    }
+    .modal-box {
+        background: white; padding: 25px; border-radius: 12px; width: 320px; text-align: center;
+        position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: popIn 0.3s ease;
+    }
+    .close-btn { position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #888; }
+    @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>
 {% endblock %}
