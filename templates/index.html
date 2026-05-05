@@ -3,8 +3,9 @@
 {% block content %}
 <section class="hero">
     <h1>Verifique o número de telefone da empresa</h1>
+    <!-- Removido o 'required' para permitir flexibilidade na pesquisa -->
     <form method="POST" class="form-box">
-        <input type="text" name="nome" placeholder="🏢 Nome da empresa" required>
+        <input type="text" name="nome" placeholder="🏢 Nome da empresa">
         <input type="text" name="telefone" placeholder="📞 Telefone">
         <button type="submit">Verificar</button>
     </form>
@@ -37,18 +38,20 @@
         <p>{{ resultado.mensagem }}</p>
 
         <div class="colunas">
-            {% if resultado.telefones %}
+            <!-- Exibe telefone se existir no resultado -->
+            {% if resultado.telefone %}
             <div class="coluna">
-                <strong>📞 Telefones</strong>
+                <strong>📞 Contato Pesquisado</strong>
                 <ul>
-                    {% for tel in resultado.telefones %}<li>{{ tel }}</li>{% endfor %}
+                    <li>{{ resultado.telefone }}</li>
                 </ul>
             </div>
             {% endif %}
 
+            <!-- Mantendo as colunas de suporte caso você adicione listas no futuro -->
             {% if resultado.emails %}
             <div class="coluna">
-                <strong>📧 Emails</strong>
+                <strong>📧 Emails Relacionados</strong>
                 <ul>
                     {% for email in resultado.emails %}<li>{{ email }}</li>{% endfor %}
                 </ul>
@@ -58,7 +61,7 @@
 
         {% if resultado.denuncias %}
         <div style="margin-top: 15px;">
-            <strong>🚨 Denúncias</strong>
+            <strong>🚨 Denúncias Recentes</strong>
             <ul>
                 {% for d in resultado.denuncias %}<li>{{ d.tipo }} - {{ d.descricao }}</li>{% endfor %}
             </ul>
