@@ -92,15 +92,19 @@ def index():
         telefone_digitado = request.form.get("telefone", "").strip()
 
         if not nome_digitado and not telefone_digitado:
-            erro_formulario = "Por favor, informe pelo menos o nome da empresa ou um telefone."
-        else:
-            # CHAMA A FUNÇÃO DE VERIFICAÇÃO REAL
-            resultado = verificar_empresa(nome_digitado, telefone_digitado)
+            erro_formulario = "Por favor, preencha pelo menos um campo."
+            return render_template("index.html", erro_formulario=erro_formulario)
 
-            # Salva no histórico da sessão
-            if 'pesquisas_recentes' not in session:
-                session['pesquisas_recentes'] = []
-            
+        # <<< AQUI ESTAVA O ERRO! VAMOS CHAMAR A FUNÇÃO REAL >>>
+        # Em vez de fazer "if telefone.startswith", chamamos a lógica do banco:
+        resultado = verificar_empresa(nome_digitado, telefone_digitado)
+
+        # Guardar no histórico da sessão
+        if 'pesquisas_recentes' not in session:
+            session['pesquisas_recentes'] = []
+        
+        # Só salva se não deu erro de "Empresa não encontrada"
+        if resultado.get("status") != "ERRO":
             pesquisas = session['pesquisas_recentes']
             pesquisas.insert(0, resultado)
             session['pesquisas_recentes'] = pesquisas[:5]
