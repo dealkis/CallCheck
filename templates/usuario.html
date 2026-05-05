@@ -92,4 +92,64 @@
 
     </div>
 </div>
+
+<!-- ESTILO DA CAIXA (MODAL) -->
+<style>
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
+    }
+    .modal-box {
+        background: white; padding: 25px; border-radius: 12px; width: 320px; text-align: center;
+        position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: popIn 0.3s ease;
+    }
+    .close-btn {
+        position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #888; font-weight: bold;
+    }
+    @keyframes popIn {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+</style>
+
+<!-- ESTRUTURA DO MODAL (SÓ APARECE SE HOUVER RESULTADO) -->
+{% if resultado_modal %}
+<div class="modal-overlay" id="modalResultado">
+    <div class="modal-box">
+        <span class="close-btn" onclick="fecharModal()">×</span>
+        
+        <div style="font-size: 40px; margin-bottom: 10px;">
+            {% if resultado_modal.status == 'OFICIAL' %}✅{% else %}❌{% endif %}
+        </div>
+        
+        <h3 style="margin-bottom: 15px;">Resultado</h3>
+        <p><strong>Empresa:</strong> {{ resultado_modal.empresa }}</p>
+        <p><strong>Telefone:</strong> {{ resultado_modal.telefone }}</p>
+        <p><strong>Status:</strong> 
+            <span style="color: {% if resultado_modal.status == 'OFICIAL' %}#28a745{% else %}#dc3545{% endif %}; font-weight: bold;">
+                {{ resultado_modal.status }}
+            </span>
+        </p>
+        
+        <button onclick="fecharModal()" style="margin-top: 20px; background: #000; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; width: 100%;">
+            Entendido
+        </button>
+    </div>
+</div>
+{% endif %}
+
+<!-- SCRIPT PARA FECHAR -->
+<script>
+    function fecharModal() {
+        document.getElementById('modalResultado').style.display = 'none';
+    }
+    
+    // Fecha se clicar fora da caixa branca
+    window.onclick = function(event) {
+        let modal = document.getElementById('modalResultado');
+        if (event.target == modal) {
+            fecharModal();
+        }
+    }
+</script>
 {% endblock %}
