@@ -91,12 +91,12 @@ def index():
             erro_formulario = "Por favor, informe pelo menos o nome da empresa ou um telefone."
             return render_template("index.html", erro_formulario=erro_formulario)
 
-        # Lógica de status (Sincronizada com o que você já usa)
+        # Lógica de status (PARA TESTE)
         if telefone_digitado.startswith("11"):
-            status_simulado = "FRAUDE"
-            mensagem_simulada = "Este número possui características de atividades fraudulentas."
+            status_simulado = "Não Oficial"
+            mensagem_simulada = "Este número é Oficial."
         else:
-            status_simulado = "OFICIAL"
+            status_simulado = "Oficial"
             mensagem_simulada = "Este é um canal verificado e seguro para contato."
 
         resultado = {
