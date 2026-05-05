@@ -136,15 +136,39 @@ def login():
     
     return render_template("login.html", erro=erro)
 
-@app.route("/usuario")
+@app.route("/usuario", methods=["GET", "POST"])
 def perfil_usuario():
-    # Proteção de acesso
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
-    # Puxa o histórico da sessão (ou lista vazia se não tiver nada ainda)
+        
+    resultado_local = None
+
+    if request.method == "POST":
+        nome_digitado = request.form.get("nome", "").strip()
+        telefone_digitado = request.form.get("telefone", "").strip()
+
+        if nome_digitado or telefone_digitado:
+            # Lógica de status sincronizada
+            status_simulado = "FRAUDE" if telefone_digitado.startswith("11") else "OFICIAL"
+            
+            resultado_local = {
+                "empresa": nome_digitado if nome_digitado else "Não informada",
+                "telefone": telefone_digitado if telefone_digitado else "---",
+                "status": status_simulado,
+                "mensagem": "Verificado via painel interno."
+            }
+
+            # Salva no histórico
+            if 'pesquisas_recentes' not in session:
+                session['pesquisas_recentes'] = []
+            
+            pesquisas = session['pesquisas_recentes']
+            pesquisas.insert(0, resultado_local)
+            session['pesquisas_recentes'] = pesquisas[:5]
+            session.modified = True 
+
     pesquisas = session.get('pesquisas_recentes', [])
-    # Envia a variável 'pesquisas' para o HTML
-    return render_template("usuario.html", pesquisas=pesquisas)
+    return render_template("usuario.html", pesquisas=pesquisas, resultado_painel=resultado_local)
 
 @app.route("/logout")
 def logout():
