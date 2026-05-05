@@ -256,3 +256,40 @@ def add_empresa():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    mensagem = None
+
+    if request.method == "POST":
+        nome = request.form.get("nome")
+        telefone = request.form.get("telefone")
+
+        if nome:
+            conn = conectar()
+            cursor = conn.cursor()
+
+            # insere empresa
+            cursor.execute(
+                "INSERT INTO empresa (nome) VALUES (%s) RETURNING id",
+                (nome,)
+            )
+            empresa_id = cursor.fetchone()[0]
+
+            # insere telefone (se tiver)
+            if telefone:
+                telefone = ''.join(filter(str.isdigit, telefone))
+
+                cursor.execute(
+                    "INSERT INTO telefone (empresa_id, numero) VALUES (%s, %s)",
+                    (empresa_id, telefone)
+                )
+
+            conn.commit()
+            conn.close()
+
+            mensagem = "Empresa cadastrada com sucesso!"
+
+    return render_template("admin.html", mensagem=mensagem)
