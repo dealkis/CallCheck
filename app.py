@@ -273,3 +273,56 @@ def teste():
     if conn:
         return "Conectado com sucesso!"
     return "Erro ao conectar"
+@app.route("/add-empresa")
+def add_empresa():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO empresa (nome)
+        VALUES ('Banco do Brasil')
+    """)
+
+    conn.commit()
+    conn.close()
+
+    return "Empresa adicionada!"
+@app.route("/add-telefone")
+def add_telefone():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO telefone (empresa_id, numero)
+        VALUES (1, '(11) 4004-0001')
+    """)
+
+    conn.commit()
+    conn.close()
+
+    return "Telefone adicionado!"
+    
+@app.route("/add-denuncia")
+def add_denuncia():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO denuncia (telefone_id, tipo)
+        VALUES (1, 'Golpe de falsa central')
+    """)
+
+    conn.commit()
+    conn.close()
+
+    return "Denúncia adicionada!"
+@app.route("/ver-empresas")
+def ver_empresas():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM empresa")
+    dados = cursor.fetchall()
+
+    conn.close()
+    return str(dados)
