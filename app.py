@@ -30,82 +30,143 @@ def conectar():
 #-----------------#
 #-----------------#
 # LÓGICA DE VERIFICAÇÃO#
-def verificar_empresa(nome, telefone=None):
+from psycopg2.extras import RealDictCursor
+
+def verificar_empresa(nome=None, telefone=None):
     conn = conectar()
-#-----------------#
-#-----------------#
-#-----------------#
-#-----------------#
-#SIMULAÇÃO#
+
     if conn is None:
-        return {
-            "empresa": nome if nome else "Empresa Demo",
-            "telefone": telefone if telefone else "Não informado",
-            "telefones": ["(11) 4004-0000", "(11) 99999-9999"],
-            "emails": ["contato@exemplo.com"],
-            "status": "CANAIS" if not telefone else "OFICIAL",
-            "mensagem": "Nota: Modo de demonstração (Banco offline)."
-        }
+        return {"status": "ERRO", "mensagem": "Erro ao conectar ao banco"}
 
     try:
-        cursor = conn.cursor(dictionary=True)
-#-----------------#
-#-----------------#
-#-----------------#
-#-----------------#
-# Busca aproximada pelo nome#
-        cursor.execute("SELECT * FROM empresa WHERE nome LIKE %s", (f"%{nome}%",))
-        empresa = cursor.fetchone()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        if not empresa:
-            conn.close()
-            return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base oficial."}
-#-----------------#
-#-----------------#
-#-----------------#
-#-----------------#
-# Busca telefones vinculados
-        cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
-        telefones = [t["numero"] for t in cursor.fetchall()]
+        # =========================
+        # CENÁRIO 1: BUSCA SÓ POR TELEFONE
+        # =========================
+        if telefone and not nome:
+            cursor.execute("""
+                SELECT e.nome, t.numero
+                FROM telefone t
+                JOIN empresa e ON t.empresa_id = e.id
+                WHERE t.numero = %s
+            """, (telefone,))
+            
+            resultado = cursor.fetchone()
+
+            if resultado:
+                return {
+                    "empresa": resultado["nome"],
+                    "telefone": telefone,
+                    "status": "ENCONTRADO",
+                    "mensagem": "Telefone vinculado a uma empresa."
+                }
+            else:
+                return {
+                    "empresa": None,
+                    "telefone": telefone,
+                    "status": "NAO_ENCONTRADO",
+                    "mensagem": "Telefone não encontrado."
+                }
+
+        # =========================
+        # CENÁRIO 2: BUSCA POR NOME
+        # =========================
+        empresa = None
+
+        if nome:
+            cursor.execute("""
+                SELECT * FROM empresa
+                WHERE nome ILIKE %s
+            """, (f"%{nome}%",))
+            
+            empresa = cursor.fetchone()
+
+            if not empresa:
+                return {
+                    "empresa": nome,
+                    "status": "NAO_CADASTRADA",
+                    "mensagem": "Empresa não encontrada."
+                }
+
+        # =========================
+        # BUSCAR TELEFONES
+        # =========================
+        telefones = []
         emails = ["atendimento@oficial.com.br"]
 
+        if empresa:
+            cursor.execute("""
+                SELECT id, numero FROM telefone
+                WHERE empresa_id = %s
+            """, (empresa["id"],))
+            
+            dados_tel = cursor.fetchall()
+            telefones = [t["numero"] for t in dados_tel]
+
         resposta = {
-            "empresa": empresa["nome"], 
-            "telefones": telefones, 
+            "empresa": empresa["nome"] if empresa else None,
+            "telefones": telefones,
             "emails": emails,
             "telefone": telefone if telefone else "Não informado"
         }
-#-----------------#
-#-----------------#
-#-----------------#
-#-----------------#
-# Lógica de Status
-        if not telefone or telefone.strip() == "":
-            resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais registrados."})
-        elif telefone in telefones:
-            resposta.update({"status": "OFICIAL", "mensagem": "Número verificado e seguro."})
-        else:
-#-----------------#
-#-----------------#
-#-----------------#
-#-----------------#
-# Verifica denúncias
-            cursor.execute("""
-                SELECT d.tipo FROM denuncia d 
-                JOIN telefone t ON d.telefone_id = t.id 
-                WHERE t.numero = %s
-            """, (telefone,))
-            denuncia = cursor.fetchone()
-            if denuncia:
-                resposta.update({"status": "ALERTA", "mensagem": "Este número possui denúncias!"})
+
+        # =========================
+        # CENÁRIO 3: SÓ EMPRESA
+        # =========================
+        if nome and not telefone:
+            resposta.update({
+                "status": "CANAIS",
+                "mensagem": "Canais oficiais da empresa."
+            })
+
+        # =========================
+        # CENÁRIO 4: EMPRESA + TELEFONE
+        # =========================
+        elif nome and telefone:
+            if telefone in telefones:
+                resposta.update({
+                    "status": "OFICIAL",
+                    "mensagem": "Número verificado e seguro."
+                })
             else:
-                resposta.update({"status": "NAO_OFICIAL", "mensagem": "Número não consta na lista oficial."})
+                # Verifica denúncia
+                cursor.execute("""
+                    SELECT d.tipo
+                    FROM denuncia d
+                    JOIN telefone t ON d.telefone_id = t.id
+                    WHERE t.numero = %s
+                """, (telefone,))
+                
+                denuncia = cursor.fetchone()
+
+                if denuncia:
+                    resposta.update({
+                        "status": "ALERTA",
+                        "mensagem": "Número possui denúncias!"
+                    })
+                else:
+                    resposta.update({
+                        "status": "NAO_OFICIAL",
+                        "mensagem": "Número não é oficial."
+                    })
+
+        # =========================
+        # CENÁRIO 5: NADA INFORMADO
+        # =========================
+        else:
+            resposta.update({
+                "status": "ERRO",
+                "mensagem": "Informe nome ou telefone."
+            })
+
         conn.close()
         return resposta
-        
+
     except Exception as e:
-        if conn: conn.close()
-        return {"status": "ERRO", "mensagem": f"Erro interno: {str(e)}"}
+        if conn:
+            conn.close()
+        return {"status": "ERRO", "mensagem": str(e)}
 #-----------------#
 #-----------------#
 #-----------------#
