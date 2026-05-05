@@ -5,7 +5,8 @@ import os
 app = Flask(__name__)
 app.secret_key = "chave_segura_acex"
 
-# --- CONFIGURAÇÃO DE CONEXÃO ---
+
+# CONFIGURAÇÃO DE CONEXÃO
 def conectar():
     try:
         return mysql.connector.connect(
@@ -19,140 +20,175 @@ def conectar():
         print(f"Erro ao conectar ao banco: {e}")
         return None
 
-# --- LÓGICA DE VERIFICAÇÃO INTEGRADA ---
+
+# LÓGICA DE VERIFICAÇÃO
 def verificar_empresa(nome, telefone=None):
     conn = conectar()
-    
-    # Se o Banco de Dados estiver OFFLINE, usa a lógica de simulação
     if conn is None:
-        # Lógica para busca apenas por nome (Dados da Empresa)
-        if nome and not telefone:
-            return {
-                "status": "Oficial",
-                "empresa": nome,
-                "telefone": "Não informado",
-                "mensagem": f"Dados oficiais encontrados para {nome} (Modo Demo)."
-            }
-        # Lógica para busca com telefone
-        status = "Não Oficial" if telefone.startswith("(11)") else "Oficial"
         return {
-            "status": status,
-            "empresa": nome if nome else "Empresa Demo",
-            "telefone": telefone,
-            "mensagem": "Nota: Banco de dados offline. Usando verificação padrão."
+            "empresa": nome,
+            "telefones": ["Conexão com banco indisponível"],
+            "emails": ["contato@exemplo.com"],
+            "status": "SIMULACAO",
+            "mensagem": "Nota: O sistema está em modo de demonstração pois não detectou um banco de dados ativo."
         }
 
     try:
         cursor = conn.cursor(dictionary=True)
-        # 1. Busca a empresa
-        cursor.execute("SELECT * FROM empresa WHERE nome LIKE %s", (f"%{nome}%",))
+        cursor.execute("SELECT * FROM empresa WHERE nome = %s", (nome,))
         empresa = cursor.fetchone()
 
         if not empresa:
             conn.close()
-            return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base oficial."}
+            return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base de dados oficial."}
 
-        # 2. Busca telefones oficiais
         cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
-        telefones_oficiais = [t["numero"] for t in cursor.fetchall()]
+        telefones = [t["numero"] for t in cursor.fetchall()]
 
-        resposta = {
-            "empresa": empresa["nome"],
-            "telefone": telefone if telefone else "Não informado",
-            "telefones": telefones_oficiais
-        }
+        emails = ["atendimento@oficial.com.br"]
 
-        # 3. Define Status (Prioridade para Dados da Empresa se telefone estiver vazio)
-        if not telefone or telefone.strip() == "":
-            resposta.update({"status": "Oficial", "mensagem": "Canais oficiais registrados encontrados."})
-        elif telefone in telefones_oficiais:
-            resposta.update({"status": "Oficial", "mensagem": "Número verificado e seguro."})
-        else:
-            # Verifica se há denúncias para o número não oficial
-            if telefone.startswith("(11)"):
-                resposta.update({"status": "Não Oficial", "mensagem": "⚠️ Atenção: Padrão de número suspeito detectado!"})
-            else:
-                resposta.update({"status": "Não Oficial", "mensagem": "Este número não consta na lista oficial desta empresa."})
+        denuncias = []
+        if telefone:
+            cursor.execute("""
+                SELECT d.tipo, d.descricao 
+                FROM denuncia d
+                JOIN telefone t ON d.telefone_id = t.id
+                WHERE t.numero = %s
+            """, (telefone,))
+            denuncias = cursor.fetchall()
 
         conn.close()
+        resposta = {"empresa": empresa["nome"], "telefones": telefones, "emails": emails}
+
+        if not telefone:
+            resposta.update({"status": "CANAIS", "mensagem": "Estes são os canais oficiais registrados para esta empresa."})
+        elif telefone in telefones:
+            resposta.update({"status": "OFICIAL", "mensagem": "Este é um número verificado e pertence à empresa."})
+        elif denuncias:
+            resposta.update({"status": "ALERTA", "mensagem": "Atenção! Este número possui denúncias de atividades suspeitas.", "denuncias": denuncias})
+        else:
+            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Este número NÃO consta na lista oficial da empresa."})
+
         return resposta
 
     except Exception as e:
         if conn: conn.close()
-        return {"status": "ERRO", "mensagem": f"Erro interno: {str(e)}"}
+        return {"status": "ERRO", "mensagem": f"Erro interno no processamento: {str(e)}"}
 
-# --- ROTAS ---
 
+# ROTAS DO SITE
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
-    erro_formulario = None
+    erro_formulario = None # Variável para guardar o erro de campo vazio
 
     if request.method == "POST":
         nome_digitado = request.form.get("nome", "").strip()
         telefone_digitado = request.form.get("telefone", "").strip()
 
+        # VALIDAÇÃO: Se o usuário não digitou NADA em nenhum dos campos
         if not nome_digitado and not telefone_digitado:
-            erro_formulario = "Por favor, preencha pelo menos um campo."
-            return render_template("index.html", erro_formulario=erro_formulario, resultado=None)
+            erro_formulario = "Por favor, informe pelo menos o nome da empresa ou um telefone."
+            return render_template("index.html", erro_formulario=erro_formulario)
 
-        resultado = verificar_empresa(nome_digitado, telefone_digitado)
+        # Lógica de status (PARA TESTE)
+        if telefone_digitado.startswith("11"):
+            status_simulado = "Não Oficial"
+            mensagem_simulada = "Este número é Oficial."
+        else:
+            status_simulado = "Oficial"
+            mensagem_simulada = "Este é um canal verificado e seguro para contato."
 
-        if resultado.get("status") != "ERRO":
-            if 'pesquisas_recentes' not in session:
-                session['pesquisas_recentes'] = []
-            pesquisas = session['pesquisas_recentes']
-            if not pesquisas or pesquisas[0] != resultado:
-                pesquisas.insert(0, resultado)
-                session['pesquisas_recentes'] = pesquisas[:5]
-                session.modified = True 
+        resultado = {
+            "empresa": nome_digitado if nome_digitado else "Não informada",
+            "telefone": telefone_digitado if telefone_digitado else "Não informado",
+            "status": status_simulado,
+            "mensagem": mensagem_simulada
+        }
+
+        # Salva no histórico da sessão
+        if 'pesquisas_recentes' not in session:
+            session['pesquisas_recentes'] = []
+
+        pesquisas = session['pesquisas_recentes']
+        pesquisas.insert(0, resultado)
+        session['pesquisas_recentes'] = pesquisas[:5]
+        session.modified = True 
 
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
-
-@app.route("/usuario", methods=["GET", "POST"])
-def perfil_usuario():
-    if "usuario_logado" not in session:
-        return redirect(url_for('login'))
-        
-    resultado_local = None
-    if request.method == "POST":
-        nome_digitado = request.form.get("nome", "").strip()
-        telefone_digitado = request.form.get("telefone", "").strip()
-        if nome_digitado or telefone_digitado:
-            resultado_local = verificar_empresa(nome_digitado, telefone_digitado)
-
-    pesquisas_historico = session.get('pesquisas_recentes', [])
-    return render_template("usuario.html", pesquisas=pesquisas_historico, resultado=resultado_local)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "usuario_logado" in session:
         return redirect(url_for('perfil_usuario'))
+
     erro = None
     if request.method == "POST":
-        u = request.form.get("usuario", "").strip()
-        s = request.form.get("senha", "").strip()
-        if u == "admin" and s == "123":
-            session["usuario_logado"] = u
+        usuario_digitado = request.form.get("usuario")
+        senha_digitada = request.form.get("senha")
+
+        if usuario_digitado == "admin" and senha_digitada == "123":
+            session.permanent = True
+            session["usuario_logado"] = usuario_digitado
             return redirect(url_for('perfil_usuario'))
-        erro = "Usuário ou senha incorretos."
+        else:
+            erro = "Usuário não encontrado ou senha incorreta."
+
     return render_template("login.html", erro=erro)
+
+@app.route("/usuario", methods=["GET", "POST"])
+def perfil_usuario():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    resultado_local = None
+
+    if request.method == "POST":
+        nome_digitado = request.form.get("nome", "").strip()
+        telefone_digitado = request.form.get("telefone", "").strip()
+
+        if nome_digitado or telefone_digitado:
+            status_simulado = "FRAUDE" if telefone_digitado.startswith("11") else "OFICIAL"
+
+            resultado_local = {
+                "empresa": nome_digitado if nome_digitado else "Não informada",
+                "telefone": telefone_digitado if telefone_digitado else "---",
+                "status": status_simulado,
+                "mensagem": "Verificado com sucesso!"
+            }
+
+            if 'pesquisas_recentes' not in session:
+                session['pesquisas_recentes'] = []
+
+            pesquisas = session['pesquisas_recentes']
+            pesquisas.insert(0, resultado_local)
+            session['pesquisas_recentes'] = pesquisas[:5]
+            session.modified = True 
+
+    pesquisas = session.get('pesquisas_recentes', [])
+    # Passamos o resultado_local aqui para o HTML saber que deve abrir a caixa
+    return render_template("usuario.html", pesquisas=pesquisas, resultado_modal=resultado_local)
 
 @app.route("/logout")
 def logout():
-    session.clear()
+    session.pop("usuario_logado", None)
     return redirect(url_for('login'))
+
+@app.route("/sobre")
+def sobre():
+    return render_template("sobre.html")
 
 @app.route("/contato")
 def contato():
     return render_template("contato.html")
 
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 @app.route("/historico")
 def historico():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
-    return render_template("historico.html", pesquisas=session.get('pesquisas_recentes', []))
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("historico.html", pesquisas=pesquisas)
