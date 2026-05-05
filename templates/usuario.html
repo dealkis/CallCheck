@@ -58,19 +58,28 @@
             
             {% if pesquisas %}
                 <ul style="list-style-type: none; padding: 0; margin-top: 20px;">
-                    {% for item in pesquisas %}
-                        <li style="background: #fff; padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #eee; border-left: 6px solid {% if item.status == 'Seguro' %}#28a745{% else %}#dc3545{% endif %}; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>Número:</strong> {{ item.numero }} <br>
-                                <small style="color: #666;"><strong>Empresa:</strong> {{ item.empresa }}</small>
-                            </div>
-                            <div style="text-align: right;">
-                                <span style="background: {% if item.status == 'Seguro' %}#d4edda{% else %}#f8d7da{% endif %}; color: {% if item.status == 'Seguro' %}#155724{% else %}#721c24{% endif %}; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold;">
-                                    {{ item.status }}
-                                </span>
-                            </div>
-                        </li>
-                    {% endfor %}
+    {% for item in pesquisas %}
+        <li style="background: #fff; padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #eee; 
+            /* COR DINÂMICA DA BARRA LATERAL */
+            border-left: 6px solid {% if item.status == 'OFICIAL' %}#28a745{% else %}#dc3545{% endif %}; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
+            
+            <div>
+                <strong>Número:</strong> {{ item.telefone }} <br>
+                <small style="color: #666;"><strong>Empresa:</strong> {{ item.empresa }}</small>
+            </div>
+            
+            <div style="text-align: right;">
+                <!-- COR DINÂMICA DA ETIQUETA (BADGE) -->
+                <span style="background: {% if item.status == 'OFICIAL' %}#d4edda{% else %}#f8d7da{% endif %}; 
+                             color: {% if item.status == 'OFICIAL' %}#155724{% else %}#721c24{% endif %}; 
+                             padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold;">
+                    {{ item.status }}
+                </span>
+            </div>
+        </li>
+    {% endfor %}
+</ul>
                 </ul>
             {% else %}
                 <!-- Mensagem caso o histórico esteja vazio -->
