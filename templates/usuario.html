@@ -8,7 +8,41 @@
 </section>
 
 <!-- Container Principal do Painel -->
-<div class="resultado" style="flex-direction: column; width: 80%; margin: 0 auto; padding: 20px;">
+<div class="resultado" style="display: flex; flex-direction: column; width: 80%; margin: 20px auto; padding: 20px; border-radius: 12px; background-color: #f9f9f9; border: 1px solid #ddd;">
+    
+    <!-- TÍTULO DINÂMICO: Muda conforme o tipo de busca -->
+    <div style="text-align: center; margin-bottom: 15px;">
+        {% if resultado.telefone == "Não informado" %}
+            <h3 style="color: #2c3e50; margin: 0;">🏢 Dados da Empresa</h3>
+        {% elif resultado.status == "Oficial" %}
+            <h3 style="color: #28a745; margin: 0;">✅ Número Oficial</h3>
+        {% else %}
+            <h3 style="color: #d93025; margin: 0;">✖️ Número Não Oficial</h3>
+        {% endif %}
+    </div>
+
+    <!-- CORPO DO RESULTADO -->
+    <div class="info-detalhes" style="line-height: 1.6;">
+        <p><strong>Status:</strong> 
+            <span style="color: {% if resultado.status == 'Oficial' %}#28a745{% else %}#d93025{% endif %}; font-weight: bold;">
+                {{ resultado.status }}
+            </span>
+        </p>
+        
+        <p><strong>Empresa:</strong> {{ resultado.empresa }}</p>
+        
+        <p style="background-color: #fff; padding: 10px; border-left: 4px solid #333; font-style: italic;">
+            {{ resultado.mensagem }}
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+        
+        <p style="margin-bottom: 0;">
+            <strong>📞 Contato Pesquisado:</strong> 
+            <span style="font-family: monospace; font-size: 1.1em;">{{ resultado.telefone }}</span>
+        </p>
+    </div>
+</div>
     <div class="info" style="background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
         
         <h2 style="margin-top: 0;">Painel do Usuário (Projeto ACEX)</h2>
