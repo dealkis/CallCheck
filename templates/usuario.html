@@ -35,7 +35,10 @@
                     <input type="text" id="nome" name="nome" placeholder="🏢 Nome da empresa">
                     
                     <!-- Campo Telefone -->
-                    <input type="text" id="telefone" name="telefone" placeholder="📞 Telefone">
+                    <input type="text" id="telefone" name="telefone" placeholder="📞 Telefone"
+                        placeholder="(00) 00000-0000" 
+                        maxlength="15" 
+                        oninput="mascaraTelefone(this)">
                 
                     <!-- AVISO GENTIL (Invisível por padrão) -->
                     <p id="avisoErro" style="display: none; color: #d93025; font-size: 0.9em; margin: 0; font-weight: bold;">
@@ -171,6 +174,22 @@
         if (event.target == modal) {
             fecharModal();
         }
+    }
+    // FUNÇÃO 2:
+    function mascaraTelefone(input) {
+        let valor = input.value;
+        valor = valor.replace(/\D/g, ""); // Remove tudo que não é número
+        
+        if (valor.length > 0) {
+            valor = "(" + valor;
+            if (valor.length > 3) {
+                valor = valor.slice(0, 3) + ") " + valor.slice(3);
+            }
+            if (valor.length > 10) {
+                valor = valor.slice(0, 10) + "-" + valor.slice(10, 14);
+            }
+        }
+        input.value = valor;
     }
 </script>
 {% endblock %}
