@@ -81,38 +81,79 @@ def verificar_empresa(nome, telefone=None):
         if conn: conn.close()
         return {"status": "ERRO", "mensagem": f"Erro interno: {str(e)}"}
 
+from flask import Flask, render_template, request, session, redirect, url_for
+import os
+
+app = Flask(__name__)
+app.secret_key = 'chave_secreta_projeto_acex' # Necessário para usar session
+
+# --- FUNÇÃO DE LÓGICA (O "CÉREBRO" DO APP) ---
+def verificar_empresa(nome, telefone):
+    """
+    Lógica para o Projeto ACEX:
+    1. Se não houver telefone: Retorna dados da empresa.
+    2. Se telefone começar com (11): Retorna Não Oficial (Simulação de Golpe).
+    3. Caso contrário: Retorna Oficial.
+    """
+    # Se o usuário buscou apenas pelo nome
+    if nome and not telefone:
+        return {
+            "status": "Oficial",
+            "empresa": nome,
+            "telefone": "Não informado",
+            "mensagem": f"Informações oficiais encontradas para a empresa {nome}."
+        }
+    
+    # Se houver telefone, verificamos o padrão de fraude (11)
+    if telefone:
+        if telefone.startswith("(11)"):
+            return {
+                "status": "Não Oficial",
+                "empresa": nome if nome else "Empresa Desconhecida",
+                "telefone": telefone,
+                "mensagem": "⚠️ Atenção: Este número NÃO é um canal oficial. Evite fornecer dados!"
+            }
+        else:
+            return {
+                "status": "Oficial",
+                "empresa": nome if nome else "Empresa Verificada",
+                "telefone": telefone,
+                "mensagem": "Este número é verificado e seguro para contato."
+            }
+    
+    return {"status": "ERRO", "mensagem": "Dados insuficientes."}
+
+# --- ROTAS ---
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
     erro_formulario = None
 
     if request.method == "POST":
-        # .strip() remove espaços extras; .replace() remove a máscara se necessário
         nome_digitado = request.form.get("nome", "").strip()
         telefone_digitado = request.form.get("telefone", "").strip()
 
         if not nome_digitado and not telefone_digitado:
             erro_formulario = "Por favor, preencha pelo menos um campo."
-            return render_template("index.html", erro_formulario=erro_formulario)
+            return render_template("index.html", erro_formulario=erro_formulario, resultado=None)
 
-        # Chama a função real que consulta seu dicionário/banco
         resultado = verificar_empresa(nome_digitado, telefone_digitado)
 
-        # Salva no histórico da sessão (máximo 5 itens)
+        # Salva no histórico da sessão
         if resultado.get("status") != "ERRO":
             if 'pesquisas_recentes' not in session:
                 session['pesquisas_recentes'] = []
             
             pesquisas = session['pesquisas_recentes']
-            # Evita duplicados no histórico
-            if resultado not in pesquisas:
+            # Evita duplicados idênticos seguidos
+            if not pesquisas or pesquisas[0] != resultado:
                 pesquisas.insert(0, resultado)
                 session['pesquisas_recentes'] = pesquisas[:5]
                 session.modified = True 
 
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
-# --- ROTA DO PAINEL DO USUÁRIO ---
 @app.route("/usuario", methods=["GET", "POST"])
 def perfil_usuario():
     if "usuario_logado" not in session:
@@ -125,10 +166,8 @@ def perfil_usuario():
         telefone_digitado = request.form.get("telefone", "").strip()
 
         if nome_digitado or telefone_digitado:
-            # Chama a função de verificação real
             resultado_local = verificar_empresa(nome_digitado, telefone_digitado)
 
-            # Só salva no histórico se for um resultado válido
             if resultado_local.get("status") != "ERRO":
                 if 'pesquisas_recentes' not in session:
                     session['pesquisas_recentes'] = []
@@ -138,14 +177,9 @@ def perfil_usuario():
                 session['pesquisas_recentes'] = pesquisas[:5]
                 session.modified = True 
 
-    # Busca o histórico da sessão para exibir na tabela da página
     pesquisas_historico = session.get('pesquisas_recentes', [])
-    
-    return render_template("usuario.html", 
-                           pesquisas=pesquisas_historico, 
-                           resultado_modal=resultado_local)
-
-# --- ROTAS DE ACESSO E UTILITÁRIOS ---
+    # IMPORTANTE: Enviando como 'resultado' para bater com o HTML do idoso
+    return render_template("usuario.html", pesquisas=pesquisas_historico, resultado=resultado_local)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -154,10 +188,9 @@ def login():
     
     erro = None
     if request.method == "POST":
-        usuario_digitado = request.form.get("usuario")
-        senha_digitada = request.form.get("senha")
+        usuario_digitado = request.form.get("usuario", "").strip()
+        senha_digitada = request.form.get("senha", "").strip()
         
-        # Simulação de login
         if usuario_digitado == "admin" and senha_digitada == "123":
             session["usuario_logado"] = usuario_digitado
             return redirect(url_for('perfil_usuario'))
@@ -168,8 +201,12 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.pop("usuario_logado", None)
+    session.clear()
     return redirect(url_for('login'))
+
+@app.route("/contato")
+def contato():
+    return render_template("contato.html")
 
 @app.route("/historico")
 def historico():
@@ -177,16 +214,6 @@ def historico():
         return redirect(url_for('login'))
     pesquisas = session.get('pesquisas_recentes', [])
     return render_template("historico.html", pesquisas=pesquisas)
-
-# --- FUNÇÃO DE APOIO (Exemplo de como tratar o status) ---
-def verificar_empresa(nome, telefone):
-    # Aqui entraria sua lógica de buscar no Banco de Dados
-    # Se o telefone vier com máscara, limpe-o antes de comparar:
-    # tel_limpo = "".join(filter(str.isdigit, telefone))
-    
-    # Exemplo de retorno esperado para NAO OFICIAL:
-    # return {"status": "NAO_OFICIAL", "empresa": nome, "telefone": telefone, "mensagem": "Número suspeito."}
-    pass
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
