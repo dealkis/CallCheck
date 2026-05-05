@@ -19,15 +19,19 @@
 </section>
 
 {% if resultado %}
+<!-- CORREÇÃO: Adicionada a classe 'neutro' para o status CANAIS -->
 <div class="resultado 
     {% if resultado.status == 'OFICIAL' %}sucesso
     {% elif resultado.status == 'ALERTA' %}alerta
+    {% elif resultado.status == 'CANAIS' %}neutro
     {% else %}erro
     {% endif %}">
     
     <div class="icone">
+        <!-- CORREÇÃO: Trocado o ✖ por um ícone de empresa para o status CANAIS -->
         {% if resultado.status == 'OFICIAL' %}✔
         {% elif resultado.status == 'ALERTA' %}⚠
+        {% elif resultado.status == 'CANAIS' %}🏢
         {% else %}✖
         {% endif %}
     </div>
@@ -36,17 +40,30 @@
         <h3>
             {% if resultado.status == 'OFICIAL' %}Número Oficial
             {% elif resultado.status == 'ALERTA' %}Número com denúncias
-            {% elif resultado.status == 'CANAIS' %}Canais oficiais
+            {% elif resultado.status == 'CANAIS' %}Canais Oficiais Registrados
             {% else %}Número não oficial
             {% endif %}
         </h3>
+        
         <p><strong>Status:</strong> {{ resultado.status }}</p>
         {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
         <p>{{ resultado.mensagem }}</p>
 
         <div class="colunas">
-            <!-- Exibe telefone se existir no resultado -->
-            {% if resultado.telefone %}
+            <!-- LISTA DE TELEFONES (Plural - para quando busca por nome) -->
+            {% if resultado.telefones %}
+            <div class="coluna">
+                <strong>📞 Telefones Oficiais</strong>
+                <ul>
+                    {% for tel in resultado.telefones %}
+                        <li>{{ tel }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <!-- Se for uma pesquisa de um telefone específico que NÃO é oficial, mostra ele aqui -->
+            {% if resultado.status != 'CANAIS' and resultado.telefone %}
             <div class="coluna">
                 <strong>📞 Contato Pesquisado</strong>
                 <ul>
@@ -55,7 +72,6 @@
             </div>
             {% endif %}
 
-            <!-- Mantendo as colunas de suporte caso você adicione listas no futuro -->
             {% if resultado.emails %}
             <div class="coluna">
                 <strong>📧 Emails Relacionados</strong>
@@ -77,4 +93,16 @@
     </div>
 </div>
 {% endif %}
+
+<!-- CSS Rápido para garantir que o 'neutro' seja branco/cinza claro -->
+<style>
+    .resultado.neutro {
+        background-color: #ffffff;
+        border: 1px solid #ddd;
+        color: #333;
+    }
+    .resultado.neutro .icone {
+        color: #2c3e50; /* Cor escura para o ícone da empresa */
+    }
+</style>
 {% endblock %}
