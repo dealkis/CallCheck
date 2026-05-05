@@ -80,26 +80,27 @@ def verificar_empresa(nome, telefone=None):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        # Captura os dois campos do formulário
         numero_pesquisado = request.form.get("numero")
+        empresa_pesquisada = request.form.get("nome_empresa")
         
-        # Aqui você teria a lógica de verificar se o número é fraude ou não.
-        # Vamos simular um resultado:
+        # Cria o registro para o histórico
+        # Se um campo estiver vazio, usamos "Não informado"
         resultado_simulado = {
-            "numero": numero_pesquisado,
-            "empresa": "Empresa Desconhecida",
-            "status": "Suspeito"
+            "numero": numero_pesquisado if numero_pesquisado else "---",
+            "empresa": empresa_pesquisada if empresa_pesquisada else "---",
+            "status": "Seguro" # Aqui viria sua lógica real de verificação
         }
-        # 1. Verifica se já existe uma lista de pesquisas na sessão
+
+        # Salva no histórico da sessão
         if 'pesquisas_recentes' not in session:
             session['pesquisas_recentes'] = []
-        # 2. Adiciona a nova pesquisa no INÍCIO da lista
+
         pesquisas = session['pesquisas_recentes']
         pesquisas.insert(0, resultado_simulado)
-        # 3. Limita para salvar apenas as últimas 5 pesquisas (para não pesar)
         session['pesquisas_recentes'] = pesquisas[:5]
-        # Importante: avisa ao Flask que a sessão foi modificada
         session.modified = True 
-        # Renderiza a página passando o resultado (adapte para o seu código atual)
+
         return render_template("index.html", resultado=resultado_simulado)
         
     return render_template("index.html")
