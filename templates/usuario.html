@@ -1,59 +1,82 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Seção de Boas-Vindas -->
 <section class="hero">
     <h1>Bem-vindo, {{ session['usuario_logado'] }}!</h1>
     <p>Você está conectado ao painel de controle do CallCheck.</p>
 </section>
 
+<!-- Container Principal do Painel -->
 <div class="resultado" style="flex-direction: column; width: 80%; margin: 0 auto; padding: 20px;">
     <div class="info" style="background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
         
-        <h2 style="margin-top: 0;">Painel Geral</h2>
-        <hr style="border: 0; border-top: 1px solid #ddd; margin-bottom: 20px;">
+        <h2 style="margin-top: 0;">Painel do Usuário (Projeto ACEX)</h2>
+        <hr style="border: 0; border-top: 1px solid #ddd; margin-bottom: 25px;">
         
-        <!-- PARTE SUPERIOR: Estatísticas e Fazer Pesquisa -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- GRID SUPERIOR: Estatísticas e Nova Pesquisa -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
             
-            <!-- Bloco 1: Estatísticas -->
+            <!-- Bloco de Estatísticas -->
             <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fafafa;">
                 <h3 style="margin-top: 0;">📊 Estatísticas</h3>
                 <p>Consultas realizadas hoje: <strong>12</strong></p>
                 <p>Números denunciados: <strong>5</strong></p>
+                <p style="font-size: 0.85em; color: #666; margin-top: 15px;">Seu nível de segurança: <span style="color: green; font-weight: bold;">Alto</span></p>
             </div>
 
-            <!-- Bloco 2: Pesquisa Rápida -->
+            <!-- Bloco de Pesquisa Rápida (Telefone + Empresa) -->
             <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fff;">
                 <h3 style="margin-top: 0;">🔍 Nova Verificação</h3>
-                <!-- O action="/" manda a pesquisa para a rota principal do site -->
-                <form action="/" method="POST" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                    <input type="text" name="numero" placeholder="Digite o número (Ex: 11999999999)" required style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
-                    <button type="submit" style="background: #000; color: #fff; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s;">
-                        Verificar Número
+                <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">Pesquise por um destes campos ou preencha ambos:</p>
+                
+                <form action="/" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Input Telefone -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #444;">Telefone:</label>
+                        <input type="text" name="numero" placeholder="(00) 00000-0000" 
+                               style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+                    </div>
+
+                    <!-- Input Nome da Empresa -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #444;">Nome da Empresa:</label>
+                        <input type="text" name="nome_empresa" placeholder="Ex: Banco, Loja ou Prestador" 
+                               style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+                    </div>
+                    
+                    <button type="submit" style="background: #000; color: #fff; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 5px; transition: 0.3s;">
+                        Verificar Agora
                     </button>
                 </form>
             </div>
-
         </div>
 
-        <!-- PARTE INFERIOR: Histórico de Pesquisas -->
+        <!-- SEÇÃO DE HISTÓRICO: Exibe as pesquisas salvas na sessão -->
         <div style="margin-top: 40px;">
             <h3 style="border-bottom: 2px solid #000; display: inline-block; padding-bottom: 5px;">🕒 Histórico Recente</h3>
             
             {% if pesquisas %}
-                <ul style="list-style-type: none; padding: 0; margin-top: 15px;">
+                <ul style="list-style-type: none; padding: 0; margin-top: 20px;">
                     {% for item in pesquisas %}
-                        <li style="background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid {% if item.status == 'Seguro' %}green{% else %}red{% endif %}; border: 1px solid #eee; border-left-width: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between;">
-                            <span><strong>Número:</strong> {{ item.numero }}</span>
-                            <span><strong>Empresa:</strong> {{ item.empresa }}</span>
-                            <span><strong>Status:</strong> <span style="color: {% if item.status == 'Seguro' %}green{% else %}red{% endif %}; font-weight: bold;">{{ item.status }}</span></span>
+                        <li style="background: #fff; padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #eee; border-left: 6px solid {% if item.status == 'Seguro' %}#28a745{% else %}#dc3545{% endif %}; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>Número:</strong> {{ item.numero }} <br>
+                                <small style="color: #666;"><strong>Empresa:</strong> {{ item.empresa }}</small>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="background: {% if item.status == 'Seguro' %}#d4edda{% else %}#f8d7da{% endif %}; color: {% if item.status == 'Seguro' %}#155724{% else %}#721c24{% endif %}; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold;">
+                                    {{ item.status }}
+                                </span>
+                            </div>
                         </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                <div style="text-align: center; padding: 30px; color: #666; background: #f9f9f9; border-radius: 8px; margin-top: 15px; border: 1px dashed #ccc;">
-                    Nenhuma pesquisa recente encontrada no seu perfil. <br>
-                    Use o campo acima para fazer sua primeira verificação!
+                <!-- Mensagem caso o histórico esteja vazio -->
+                <div style="text-align: center; padding: 40px; color: #888; background: #fdfdfd; border-radius: 8px; margin-top: 20px; border: 2px dashed #eee;">
+                    <p style="font-size: 1.1em; margin: 0;">Nenhuma consulta realizada recentemente.</p>
+                    <p style="font-size: 0.9em; margin-top: 5px;">Seus resultados aparecerão aqui automaticamente.</p>
                 </div>
             {% endif %}
         </div>
