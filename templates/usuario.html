@@ -30,12 +30,29 @@
                 <h3 style="margin-top: 0;">🔍 Nova Verificação</h3>
                 <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">Pesquise por um destes campos ou preencha ambos:</p>
                 
-               <form action="{{ url_for('perfil_usuario') }}" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
+               <form id="formPesquisa" method="POST" class="form-box">
+                    <input type="text" id="nome" name="nome" placeholder="🏢 Nome da empresa">
+                    <input type="text" id="telefone" name="telefone" placeholder="📞 Telefone">
+                    <button type="button" onclick="validarBusca()">Verificar</button>
+                </form>
+                
+                <script>
+                function validarBusca() {
+                    var nome = document.getElementById('nome').value.trim();
+                    var telefone = document.getElementById('telefone').value.trim();
+                
+                    if (nome === "" && telefone === "") {
+                        alert("Ops! Informe pelo menos o nome ou o telefone para continuar.");
+                    } else {
+                        document.getElementById('formPesquisa').submit();
+                    }
+                }
+                </script>
                     
                     <!-- Input Nome da Empresa -->
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                         <label style="font-size: 0.8em; font-weight: bold; color: #444;">Nome da Empresa:</label>
-                        <input type="text" name="nome" placeholder="Ex: Banco, Loja ou Prestador" required
+                        <input type="text" name="nome" placeholder="Ex: Banco, Loja ou Prestador"
                                style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
                     </div>
                    
