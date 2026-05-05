@@ -293,3 +293,34 @@ def admin():
             mensagem = "Empresa cadastrada com sucesso!"
 
     return render_template("admin.html", mensagem=mensagem)
+
+
+@app.route("/admin/empresas")
+def listar_empresas():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM empresa")
+    empresas = cursor.fetchall()
+
+    conn.close()
+
+    return render_template("empresas.html", empresas=empresas)
+
+@app.route("/admin/excluir/<int:id>")
+def excluir_empresa(id):
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM empresa WHERE id = %s", (id,))
+    conn.commit()
+
+    conn.close()
+
+    return redirect(url_for('listar_empresas'))
