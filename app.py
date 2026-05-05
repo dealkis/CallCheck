@@ -92,7 +92,7 @@ def index():
             return render_template("index.html", erro_formulario=erro_formulario)
 
         # Lógica de status (PARA TESTE)
-        if telefone_digitado.startswith("11"):
+        if telefone_digitado.startswith("(11)"):
             status_simulado = "Não Oficial"
             mensagem_simulada = "Este número é Oficial."
         else:
