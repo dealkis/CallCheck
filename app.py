@@ -23,11 +23,11 @@ def conectar():
 def verificar_empresa(nome, telefone=None):
     conn = conectar()
     
-    # --- BLOCO DE SUBSTITUIÇÃO (MODO DEMO) ---
+    # --- MODO DEMO MELHORADO (Busca por Nome ou Telefone) ---
     if conn is None:
-        nome_busca = nome.lower() if nome else ""
+        nome_busca = nome.lower().strip() if nome else ""
+        tel_busca = telefone.strip() if telefone else ""
         
-        # Simulamos nosso "banco de dados" aqui dentro
         banco_demo = {
             "magalu": {
                 "nome": "Magazine Luiza (Magalu)",
@@ -41,57 +41,47 @@ def verificar_empresa(nome, telefone=None):
             }
         }
 
-        # Tenta encontrar a empresa no banco demo
         dados = None
-        for chave in banco_demo:
-            if chave in nome_busca:
-                dados = banco_demo[chave]
-                break
+        # 1. Tenta buscar primeiro pelo TELEFONE (se informado)
+        if tel_busca:
+            for chave in banco_demo:
+                if tel_busca in banco_demo[chave]["telefones"]:
+                    dados = banco_demo[chave]
+                    break
+        
+        # 2. Se não achou pelo telefone, tenta pelo NOME (se informado)
+        if not dados and nome_busca:
+            for chave in banco_demo:
+                if chave in nome_busca:
+                    dados = banco_demo[chave]
+                    break
 
+        # Se não achou em nenhum dos dois casos
         if not dados:
-            return {"status": "ERRO", "mensagem": "Empresa não encontrada (Modo Demo)."}
+            return {"status": "ERRO", "mensagem": "Nenhum registro encontrado com esses dados."}
 
+        # Preparar a resposta
         resposta = {
             "empresa": dados["nome"],
             "telefones": dados["telefones"],
             "emails": dados["emails"],
-            "telefone": telefone if telefone else "Não informado"
+            "telefone": tel_busca if tel_busca else "Não informado"
         }
 
-        # Lógica para os 3 cenários de teste:
-        if not telefone or telefone.strip() == "":
-            # CENÁRIO 1: Só pesquisou o nome
-            resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais encontrados."})
-        elif telefone in dados["telefones"]:
-            # CENÁRIO 2: Empresa cadastrada e telefone CORRETO
-            resposta.update({"status": "OFICIAL", "mensagem": "Número verificado e seguro."})
+        # Lógica de Status Baseada na Busca
+        if not tel_busca:
+            # Pesquisou só por nome
+            resposta.update({"status": "CANAIS", "mensagem": "Exibindo canais oficiais da empresa."})
+        elif tel_busca in dados["telefones"]:
+            # O telefone pesquisado é um dos oficiais
+            resposta.update({"status": "OFICIAL", "mensagem": "Este número é oficial e seguro."})
         else:
-            # CENÁRIO 3: Empresa cadastrada, mas telefone DIFERENTE
-            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Atenção: Este número não é oficial desta empresa."})
+            # Achou a empresa pelo nome, mas o telefone informado é diferente
+            resposta.update({"status": "NAO_OFICIAL", "mensagem": "Atenção: Este número NÃO pertence aos canais oficiais."})
 
         return resposta
-    # --- FIM DO BLOCO DE SUBSTITUIÇÃO ---
 
-    # Daqui para baixo é o seu código ORIGINAL para quando o banco existir
-    try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM empresa WHERE nome LIKE %s", (f"%{nome}%",))
-        empresa = cursor.fetchone()
-
-        if not empresa:
-            conn.close()
-            return {"status": "ERRO", "mensagem": "Empresa não encontrada em nossa base oficial."}
-
-        cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (empresa["id"],))
-        telefones = [t["numero"] for t in cursor.fetchall()]
         
-        resposta = {
-            "empresa": empresa["nome"], 
-            "telefones": telefones, 
-            "emails": ["atendimento@oficial.com.br"],
-            "telefone": telefone if telefone else "Não informado"
-        }
-
         # Lógica de Status
         if not telefone or telefone.strip() == "":
             resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais registrados."})
