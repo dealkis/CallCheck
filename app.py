@@ -24,15 +24,25 @@ def verificar_empresa(nome, telefone=None):
     conn = conectar()
 
     # Se não houver banco, retorna simulação mas com a chave 'telefone'
-    if conn is None:
-        return {
-            "empresa": nome if nome else "Empresa Demo",
-            "telefone": telefone if telefone else "Não informado",
-            "telefones": ["(11) 4004-0000", "(11) 99999-9999"],
-            "emails": ["contato@exemplo.com"],
-            "status": "CANAIS" if not telefone else "OFICIAL",
-            "mensagem": "Nota: Modo de demonstração (Banco offline)."
-        }
+        if conn is None:
+            telefones_simulados = ["(11) 4004-0000", "(11) 99999-9999"]
+            status_simulado = "CANAIS"
+            
+            if telefone:
+                # Verifica se o telefone digitado está na lista (ou se a lista contém o digitado)
+                if telefone in telefones_simulados:
+                    status_simulado = "OFICIAL"
+                else:
+                    status_simulado = "NAO_OFICIAL"
+        
+            return {
+                "empresa": nome if nome else "Empresa Demo",
+                "telefone": telefone if telefone else "Não informado",
+                "telefones": telefones_simulados,
+                "emails": ["contato@exemplo.com"],
+                "status": status_simulado,
+                "mensagem": "Nota: Modo de demonstração (Banco offline)."
+            }
 
     try:
         cursor = conn.cursor(dictionary=True)
