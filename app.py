@@ -2,12 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, session
 import mysql.connector
 import os
 
-
 app = Flask(__name__)
-app.secret_key = "chave_segura_acex" # Escolha qualquer frase aqui
-# =========================
-# CONFIGURAÇÃO DE CONEXÃO (Seu código original)
-# =========================
+app.secret_key = "chave_segura_acex"
+
+
+# CONFIGURAÇÃO DE CONEXÃO
 def conectar():
     try:
         return mysql.connector.connect(
@@ -21,9 +20,8 @@ def conectar():
         print(f"Erro ao conectar ao banco: {e}")
         return None
 
-# =========================
-# LÓGICA DE VERIFICAÇÃO (Seu código original)
-# =========================
+
+# LÓGICA DE VERIFICAÇÃO
 def verificar_empresa(nome, telefone=None):
     conn = conectar()
     if conn is None:
@@ -77,24 +75,37 @@ def verificar_empresa(nome, telefone=None):
         if conn: conn.close()
         return {"status": "ERRO", "mensagem": f"Erro interno no processamento: {str(e)}"}
 
-# =========================
-# ROTAS DO SITE
-# =========================
 
+# ROTAS DO SITE
 @app.route("/", methods=["GET", "POST"])
 def index():
-    resultado = None
     if request.method == "POST":
-        nome_empresa = request.form.get("nome")
-        numero_tel = request.form.get("telefone")
-        if numero_tel:
-            numero_tel = numero_tel.strip()
-        resultado = verificar_empresa(nome_empresa, numero_tel)
-    return render_template("index.html", resultado=resultado)
+        numero_pesquisado = request.form.get("numero")
+        
+        # Aqui você teria a lógica de verificar se o número é fraude ou não.
+        # Vamos simular um resultado:
+        resultado_simulado = {
+            "numero": numero_pesquisado,
+            "empresa": "Empresa Desconhecida",
+            "status": "Suspeito"
+        }
+        # 1. Verifica se já existe uma lista de pesquisas na sessão
+        if 'pesquisas_recentes' not in session:
+            session['pesquisas_recentes'] = []
+        # 2. Adiciona a nova pesquisa no INÍCIO da lista
+        pesquisas = session['pesquisas_recentes']
+        pesquisas.insert(0, resultado_simulado)
+        # 3. Limita para salvar apenas as últimas 5 pesquisas (para não pesar)
+        session['pesquisas_recentes'] = pesquisas[:5]
+        # Importante: avisa ao Flask que a sessão foi modificada
+        session.modified = True 
+        # Renderiza a página passando o resultado (adapte para o seu código atual)
+        return render_template("index.html", resultado=resultado_simulado)
+        
+    return render_template("index.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # Se o cara já está logado e tentou entrar na página de login, manda ele pra área dele
     if "usuario_logado" in session:
         return redirect(url_for('perfil_usuario'))
         
@@ -104,7 +115,7 @@ def login():
         senha_digitada = request.form.get("senha")
 
         if usuario_digitado == "admin" and senha_digitada == "123":
-            session.permanent = True # Faz a sessão durar mais tempo
+            session.permanent = True
             session["usuario_logado"] = usuario_digitado
             return redirect(url_for('perfil_usuario'))
         else:
@@ -114,7 +125,6 @@ def login():
 
 @app.route("/usuario")
 def perfil_usuario():
-    # Verifica se o usuário tem o "crachá" de sessão
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
         
@@ -122,7 +132,6 @@ def perfil_usuario():
 
 @app.route("/logout")
 def logout():
-    # Remove a sessão e desloga o usuário
     session.pop("usuario_logado", None)
     return redirect(url_for('login'))
     
@@ -137,3 +146,10 @@ def contato():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+    
+@app.route("/historico")
+def historico():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("historico.html", pesquisas=pesquisas)
