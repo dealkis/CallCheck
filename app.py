@@ -259,3 +259,8 @@ def criar_tabelas():
 
     conn.commit()
     conn.close()
+    
+@app.route("/criar-banco")
+def criar_banco():
+    criar_tabelas()
+    return "Banco criado com sucesso!"
