@@ -98,12 +98,12 @@ def index():
         
             # PRIORIDADE 1: Se o usuário pesquisou APENAS pelo nome
             if nome_digitado and not telefone_digitado:
-                status_simulado = "Oficial"
-                mensagem_simulada = f"Informações oficiais encontradas para a empresa {nome_digitado}."
+                status_simulado = "Dados da empresa"
+                mensagem_simulada = "Informações oficiais encontradas para a empresa {nome_digitado}."
                 
                 # Preparamos os dados para exibição
                 empresa_exibir = nome_digitado
-                telefone_exibir = "Não informado"
+                telefone_exibir = "(11) 4979-3030"
         
             # PRIORIDADE 2: Se o usuário inseriu um telefone (com ou sem nome)
             elif telefone_digitado:
