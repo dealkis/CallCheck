@@ -81,13 +81,13 @@ def verificar_empresa(nome, telefone=None):
         if conn: conn.close()
         return {"status": "ERRO", "mensagem": f"Erro interno: {str(e)}"}
 
-# ROTAS DO SITE
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
     erro_formulario = None
 
     if request.method == "POST":
+        # .strip() remove espaços extras; .replace() remove a máscara se necessário
         nome_digitado = request.form.get("nome", "").strip()
         telefone_digitado = request.form.get("telefone", "").strip()
 
@@ -95,23 +95,24 @@ def index():
             erro_formulario = "Por favor, preencha pelo menos um campo."
             return render_template("index.html", erro_formulario=erro_formulario)
 
-        # <<< AQUI ESTAVA O ERRO! VAMOS CHAMAR A FUNÇÃO REAL >>>
-        # Em vez de fazer "if telefone.startswith", chamamos a lógica do banco:
+        # Chama a função real que consulta seu dicionário/banco
         resultado = verificar_empresa(nome_digitado, telefone_digitado)
 
-        # Guardar no histórico da sessão
-        if 'pesquisas_recentes' not in session:
-            session['pesquisas_recentes'] = []
-        
-        # Só salva se não deu erro de "Empresa não encontrada"
+        # Salva no histórico da sessão (máximo 5 itens)
         if resultado.get("status") != "ERRO":
+            if 'pesquisas_recentes' not in session:
+                session['pesquisas_recentes'] = []
+            
             pesquisas = session['pesquisas_recentes']
-            pesquisas.insert(0, resultado)
-            session['pesquisas_recentes'] = pesquisas[:5]
-            session.modified = True 
+            # Evita duplicados no histórico
+            if resultado not in pesquisas:
+                pesquisas.insert(0, resultado)
+                session['pesquisas_recentes'] = pesquisas[:5]
+                session.modified = True 
 
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
+# --- ROTA DO PAINEL DO USUÁRIO ---
 @app.route("/usuario", methods=["GET", "POST"])
 def perfil_usuario():
     if "usuario_logado" not in session:
@@ -124,35 +125,45 @@ def perfil_usuario():
         telefone_digitado = request.form.get("telefone", "").strip()
 
         if nome_digitado or telefone_digitado:
-            # CHAMA A FUNÇÃO DE VERIFICAÇÃO REAL
+            # Chama a função de verificação real
             resultado_local = verificar_empresa(nome_digitado, telefone_digitado)
 
-            if 'pesquisas_recentes' not in session:
-                session['pesquisas_recentes'] = []
-            
-            pesquisas = session['pesquisas_recentes']
-            pesquisas.insert(0, resultado_local)
-            session['pesquisas_recentes'] = pesquisas[:5]
-            session.modified = True 
+            # Só salva no histórico se for um resultado válido
+            if resultado_local.get("status") != "ERRO":
+                if 'pesquisas_recentes' not in session:
+                    session['pesquisas_recentes'] = []
+                
+                pesquisas = session['pesquisas_recentes']
+                pesquisas.insert(0, resultado_local)
+                session['pesquisas_recentes'] = pesquisas[:5]
+                session.modified = True 
 
-    pesquisas = session.get('pesquisas_recentes', [])
-    return render_template("usuario.html", pesquisas=pesquisas, resultado_modal=resultado_local)
+    # Busca o histórico da sessão para exibir na tabela da página
+    pesquisas_historico = session.get('pesquisas_recentes', [])
+    
+    return render_template("usuario.html", 
+                           pesquisas=pesquisas_historico, 
+                           resultado_modal=resultado_local)
 
-# --- MANTIDAS AS OUTRAS ROTAS (LOGIN, LOGOUT, ETC) ---
+# --- ROTAS DE ACESSO E UTILITÁRIOS ---
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "usuario_logado" in session:
         return redirect(url_for('perfil_usuario'))
+    
     erro = None
     if request.method == "POST":
         usuario_digitado = request.form.get("usuario")
         senha_digitada = request.form.get("senha")
+        
+        # Simulação de login
         if usuario_digitado == "admin" and senha_digitada == "123":
             session["usuario_logado"] = usuario_digitado
             return redirect(url_for('perfil_usuario'))
         else:
             erro = "Usuário ou senha incorretos."
+            
     return render_template("login.html", erro=erro)
 
 @app.route("/logout")
@@ -160,20 +171,22 @@ def logout():
     session.pop("usuario_logado", None)
     return redirect(url_for('login'))
 
-@app.route("/sobre")
-def sobre():
-    return render_template("sobre.html")
-
-@app.route("/contato")
-def contato():
-    return render_template("contato.html")
-
 @app.route("/historico")
 def historico():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
     pesquisas = session.get('pesquisas_recentes', [])
     return render_template("historico.html", pesquisas=pesquisas)
+
+# --- FUNÇÃO DE APOIO (Exemplo de como tratar o status) ---
+def verificar_empresa(nome, telefone):
+    # Aqui entraria sua lógica de buscar no Banco de Dados
+    # Se o telefone vier com máscara, limpe-o antes de comparar:
+    # tel_limpo = "".join(filter(str.isdigit, telefone))
+    
+    # Exemplo de retorno esperado para NAO OFICIAL:
+    # return {"status": "NAO_OFICIAL", "empresa": nome, "telefone": telefone, "mensagem": "Número suspeito."}
+    pass
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
