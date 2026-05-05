@@ -230,3 +230,32 @@ if __name__ == "__main__":
 #-----------------#
 #-----------------#
 #-----------------#
+def criar_tabelas():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS empresa (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS telefone (
+        id SERIAL PRIMARY KEY,
+        empresa_id INT REFERENCES empresa(id),
+        numero VARCHAR(20)
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS denuncia (
+        id SERIAL PRIMARY KEY,
+        telefone_id INT REFERENCES telefone(id),
+        tipo VARCHAR(100)
+    );
+    """)
+
+    conn.commit()
+    conn.close()
