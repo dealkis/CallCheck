@@ -92,19 +92,39 @@ def index():
             return render_template("index.html", erro_formulario=erro_formulario)
 
         # Lógica de status (PARA TESTE)
-        if telefone_digitado.startswith("(11)"):
-            status_simulado = "Não Oficial"
-            mensagem_simulada = "Este número é Oficial."
-        else:
-            status_simulado = "Oficial"
-            mensagem_simulada = "Este é um canal verificado e seguro para contato."
-
-        resultado = {
-            "empresa": nome_digitado if nome_digitado else "Não informada",
-            "telefone": telefone_digitado if telefone_digitado else "Não informado",
-            "status": status_simulado,
-            "mensagem": mensagem_simulada
-        }
+        if request.method == "POST":
+            nome_digitado = request.form.get("nome", "").strip()
+            telefone_digitado = request.form.get("telefone", "").strip()
+        
+            # PRIORIDADE 1: Se o usuário pesquisou APENAS pelo nome
+            if nome_digitado and not telefone_digitado:
+                status_simulado = "Oficial"
+                mensagem_simulada = f"Informações oficiais encontradas para a empresa {nome_digitado}."
+                
+                # Preparamos os dados para exibição
+                empresa_exibir = nome_digitado
+                telefone_exibir = "Não informado"
+        
+            # PRIORIDADE 2: Se o usuário inseriu um telefone (com ou sem nome)
+            elif telefone_digitado:
+                # A verificação de fraude agora usa o telefone_digitado com a máscara (11)
+                if telefone_digitado.startswith("(11)"):
+                    status_simulado = "Não Oficial"
+                    mensagem_simulada = "Atenção: Este número NÃO é um canal oficial de atendimento."
+                else:
+                    status_simulado = "Oficial"
+                    mensagem_simulada = "Este número é verificado e seguro para contato."
+                
+                empresa_exibir = nome_digitado if nome_digitado else "Empresa não identificada"
+                telefone_exibir = telefone_digitado
+        
+            # Criando o dicionário que o seu usuario.html e index.html já usam
+            resultado = {
+                "empresa": empresa_exibir,
+                "telefone": telefone_exibir,
+                "status": status_simulado,
+                "mensagem": mensagem_simulada
+            }
 
         # Salva no histórico da sessão
         if 'pesquisas_recentes' not in session:
