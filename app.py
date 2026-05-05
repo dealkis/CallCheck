@@ -138,27 +138,25 @@ def login():
 
 @app.route("/usuario", methods=["GET", "POST"])
 def perfil_usuario():
-    # 1. Trava de segurança: se não tiver logado, vai para o login
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
         
-    # 2. Se o formulário da própria página de usuário for enviado
+    resultado_local = None
+
     if request.method == "POST":
         nome_digitado = request.form.get("nome", "").strip()
         telefone_digitado = request.form.get("telefone", "").strip()
 
         if nome_digitado or telefone_digitado:
-            # Lógica de status
             status_simulado = "FRAUDE" if telefone_digitado.startswith("11") else "OFICIAL"
             
             resultado_local = {
                 "empresa": nome_digitado if nome_digitado else "Não informada",
                 "telefone": telefone_digitado if telefone_digitado else "---",
                 "status": status_simulado,
-                "mensagem": "Verificado via painel interno."
+                "mensagem": "Verificado com sucesso!"
             }
 
-            # Salva no histórico da sessão
             if 'pesquisas_recentes' not in session:
                 session['pesquisas_recentes'] = []
             
@@ -166,14 +164,11 @@ def perfil_usuario():
             pesquisas.insert(0, resultado_local)
             session['pesquisas_recentes'] = pesquisas[:5]
             session.modified = True 
-        
-        # IMPORTANTE: Após processar o POST, recarregamos a própria página de usuário
-        return redirect(url_for('perfil_usuario'))
 
-    # 3. Carregamento normal da página (GET)
     pesquisas = session.get('pesquisas_recentes', [])
-    return render_template("usuario.html", pesquisas=pesquisas)
-
+    # Passamos o resultado_local aqui para o HTML saber que deve abrir a caixa
+    return render_template("usuario.html", pesquisas=pesquisas, resultado_modal=resultado_local)
+    
 @app.route("/logout")
 def logout():
     session.pop("usuario_logado", None)
