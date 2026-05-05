@@ -1,0 +1,43 @@
+<h2>Gerenciar Empresa</h2>
+
+<!-- EDITAR NOME -->
+<form method="POST">
+    <input type="hidden" name="acao" value="editar_nome">
+    <input type="text" name="nome" value="{{ empresa[1] }}">
+    <button type="submit">Salvar Nome</button>
+</form>
+
+<hr>
+
+<!-- TELEFONES -->
+<h3>Telefones</h3>
+
+<ul>
+{% for t in telefones %}
+    <li>
+        {{ t[2] }}
+        <form method="POST" style="display:inline;">
+            <input type="hidden" name="acao" value="excluir_telefone">
+            <input type="hidden" name="tel_id" value="{{ t[0] }}">
+            <button type="submit">Excluir</button>
+        </form>
+    </li>
+{% endfor %}
+</ul>
+
+<!-- ADICIONAR TELEFONE -->
+<form method="POST">
+    <input type="hidden" name="acao" value="add_telefone">
+    <input type="text" name="telefone" placeholder="Novo telefone">
+    <button type="submit">Adicionar</button>
+</form>
+
+<hr>
+
+<!-- EXCLUIR EMPRESA -->
+<form method="POST">
+    <input type="hidden" name="acao" value="excluir_empresa">
+    <button type="submit" onclick="return confirm('Excluir empresa inteira?')">
+        Excluir Empresa
+    </button>
+</form>
