@@ -266,6 +266,24 @@ def listar_empresas():
                            empresas=empresas_raw, 
                            pagina=pagina)
 
+@app.route("/admin/empresa/<cnpj>")
+def visualizar_empresa(cnpj):
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    conn = conectar()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Busca absolutamente todas as colunas da empresa
+    cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj = %s", (cnpj,))
+    empresa = cursor.fetchone()
+    conn.close()
+
+    if not empresa:
+        return "Empresa não encontrada", 404
+
+    return render_template("detalhes_empresa.html", empresa=empresa)
+
 #-----#
 
 if __name__ == "__main__":
