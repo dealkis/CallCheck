@@ -30,9 +30,9 @@
                     <td class="telefone-col">{{ e.telefone_formatado }}</td>
 
                     <td class="acoes">
-                        <!-- Botão ajustado: como não temos um ID numérico simples da Receita aqui, 
-                             poderíamos usar o CNPJ se ele estivesse no SELECT, mas para visualização rápida: -->
-                        <span class="status-badge">Oficial</span>
+                        <a href="{{ url_for('visualizar_empresa', cnpj=e.cnpj) }}" class="btn-ver">
+                            🔍 Detalhes
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
