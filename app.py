@@ -26,7 +26,32 @@ def conectar():
 # UTIL
 # =========================
 def limpar_telefone(tel):
+    # Recebe uma string de telefone e remove tudo que não for número
     return ''.join(filter(str.isdigit, tel or ""))
+
+def formatar_telefone(ddd, num):
+    """
+    Transforma 11988887777 em (11) 9 8888-7777
+    Ou 1133334444 em (11) 3333-4444
+    """
+    if not ddd or not num:
+        return "Não informado"
+    
+    # Garante que temos apenas números
+    num = "".join(filter(str.isdigit, num))
+    ddd = "".join(filter(str.isdigit, ddd))
+    
+    # Celular (9 dígitos): (XX) 9 XXXX-XXXX
+    if len(num) == 9:
+        return f"({ddd}) {num[0]} {num[1:5]}-{num[5:]}"
+    
+    # Fixo (8 dígitos): (XX) XXXX-XXXX
+    elif len(num) == 8:
+        return f"({ddd}) {num[0:4]}-{num[4:]}"
+    
+    # Caso o número tenha um formato inesperado, retorna (DD) NUMERO
+    else:
+        return f"({ddd}) {num}"
 
 # =========================
 # VERIFICAÇÃO (AJUSTADA PARA A NOVA TABELA)
@@ -38,16 +63,16 @@ def verificar_empresa(nome=None, telefone=None):
 
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        telefone = limpar_telefone(telefone)
+        telefone_limpo = limpar_telefone(telefone)
 
         # 1. BUSCA POR TELEFONE
-        if telefone and not nome:
+        if telefone_limpo and not nome:
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, email, uf
                 FROM estabelecimentos_raw 
                 WHERE (ddd1 || telefone1) = %s OR (ddd2 || telefone2) = %s
                 LIMIT 1
-            """, (telefone, telefone))
+            """, (telefone_limpo, telefone_limpo))
             
             resultado = cursor.fetchone()
             conn.close()
@@ -56,7 +81,7 @@ def verificar_empresa(nome=None, telefone=None):
                 nome_exibir = resultado["nome_fantasia"] if resultado["nome_fantasia"] else "Empresa Registrada"
                 return {
                     "empresa": nome_exibir,
-                    "telefone": telefone,
+                    "telefone": formatar_telefone(resultado["ddd1"], resultado["telefone1"]),
                     "status": "ENCONTRADO",
                     "uf": resultado["uf"],
                     "mensagem": f"Telefone vinculado a uma empresa em {resultado['uf']}."
@@ -87,15 +112,20 @@ def verificar_empresa(nome=None, telefone=None):
                     "mensagem": "Empresa não encontrada."
                 }
 
-            telefones = []
+            telefones_formatados = []
+            telefones_brutos = []
+            
             if empresa['ddd1'] and empresa['telefone1']:
-                telefones.append(empresa['ddd1'] + empresa['telefone1'])
+                telefones_brutos.append(empresa['ddd1'] + empresa['telefone1'])
+                telefones_formatados.append(formatar_telefone(empresa['ddd1'], empresa['telefone1']))
+            
             if empresa['ddd2'] and empresa['telefone2']:
-                telefones.append(empresa['ddd2'] + empresa['telefone2'])
+                telefones_brutos.append(empresa['ddd2'] + empresa['telefone2'])
+                telefones_formatados.append(formatar_telefone(empresa['ddd2'], empresa['telefone2']))
 
             resposta = {
                 "empresa": empresa["nome_fantasia"],
-                "telefones": telefones,
+                "telefones": telefones_formatados,
                 "telefone": telefone if telefone else "Não informado",
                 "uf": empresa["uf"]
             }
@@ -103,7 +133,7 @@ def verificar_empresa(nome=None, telefone=None):
             if nome and not telefone:
                 resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais encontrados."})
             elif nome and telefone:
-                if telefone in telefones:
+                if telefone_limpo in telefones_brutos:
                     resposta.update({"status": "OFICIAL", "mensagem": "Número verificado e seguro."})
                 else:
                     resposta.update({"status": "NAO_OFICIAL", "mensagem": "Número não consta como oficial."})
@@ -192,28 +222,26 @@ def denuncia():
     return render_template("em_obras.html")
 
 # =========================
-# ADMIN (MANTIDAS)
+# ADMIN
 # =========================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if "usuario_logado" not in session: return redirect(url_for('login'))
     mensagem = None
     if request.method == "POST":
-        # Nota: Esta parte ainda tenta inserir na tabela 'empresa' antiga.
-        # Se desejar usar a nova tabela para cadastros manuais, precisaremos ajustar aqui.
         mensagem = "Funcionalidade de cadastro manual em manutenção (Base Receita Ativa)."
     return render_template("admin.html", mensagem=mensagem)
 
-@app.route("empresas")
+@app.route("/admin/empresas")
 def listar_empresas():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
 
     conn = conectar()
+    if not conn: return "Erro de conexão"
+    
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Buscamos as primeiras 100 empresas para evitar travamentos
-    # Ordenamos por nome para ficar organizado
     cursor.execute("""
         SELECT nome_fantasia, ddd1, telefone1, uf 
         FROM estabelecimentos_raw 
@@ -224,7 +252,6 @@ def listar_empresas():
     empresas_raw = cursor.fetchall()
     conn.close()
 
-    # Formata os telefones antes de enviar para o HTML
     for emp in empresas_raw:
         emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
 
