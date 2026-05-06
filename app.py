@@ -230,7 +230,7 @@ def admin():
     mensagem = None
     if request.method == "POST":
         mensagem = "Funcionalidade de cadastro manual em manutenção (Base Receita Ativa)."
-    return render_template("admin.html", mensagem=mensagem)
+    return render_template("em_obras.html", mensagem=mensagem)
 
 @app.route("/admin/empresas")
 def listar_empresas():
