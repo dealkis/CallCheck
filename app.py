@@ -7,7 +7,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
 
 # =========================
-# CONEXÃO DIRETA (FIXO)
+# CONEXÃO DIRETA
 # =========================
 def conectar():
     URL_EXTERNA = "postgresql://banco_de_dados_callcheck_user:evZM58eGjtd0qMGoDveRi1DGTvOyd2d7@dpg-d7sdccd0lvsc73ae488g-a.oregon-postgres.render.com/banco_de_dados_callcheck"
@@ -18,7 +18,7 @@ def conectar():
         return None
 
 # =========================
-# UTILITÁRIOS (PRESERVADOS)
+# UTILITÁRIOS
 # =========================
 def limpar_telefone(tel):
     return ''.join(filter(str.isdigit, tel or ""))
@@ -36,7 +36,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO COMPLETA (ESTRUTURA ORIGINAL + NOVA BUSCA)
+# LÓGICA DE VERIFICAÇÃO (NOME + TELEFONE)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     conn = conectar()
@@ -47,7 +47,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         telefone_limpo = limpar_telefone(telefone)
 
-        # 1. CENÁRIO: NOME + TELEFONE (A novidade que você pediu)
+        # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
         if nome and telefone_limpo:
             termo_busca = f"%{nome}%"
             query = """
@@ -60,7 +60,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             if uf and uf.strip():
                 query += " AND uf = %s"
                 parametros.append(uf.strip().upper())
-            
+
             cursor.execute(query + " LIMIT 1", tuple(parametros))
             resultado = cursor.fetchone()
             conn.close()
@@ -81,7 +81,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     "mensagem": "Número não consta como oficial para esta empresa."
                 }
 
-        # 2. CENÁRIO: APENAS TELEFONE
+        # CENÁRIO 2: BUSCA APENAS POR TELEFONE
         elif telefone_limpo and not nome:
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf
@@ -99,9 +99,9 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     "uf": resultado["uf"],
                     "mensagem": f"Telefone vinculado a uma empresa em {resultado['uf']}."
                 }
-            return {"empresa": None, "telefone": telefone, "status": "NAO_ENCONTRADO", "mensagem": "Não encontrado."}
+            return {"empresa": None, "telefone": telefone, "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
-        # 3. CENÁRIO: APENAS NOME (PAGINADO E COMPLETO)
+        # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA)
         elif nome:
             por_pagina = 10
             offset = (pagina - 1) * por_pagina
@@ -112,7 +112,13 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 query_base += " AND uf = %s"
                 parametros.append(uf.strip().upper())
 
-            cursor.execute(f"SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf FROM estabelecimentos_raw {query_base} ORDER BY nome_fantasia ASC LIMIT %s OFFSET %s", tuple(parametros + [por_pagina + 1, offset]))
+            cursor.execute(f"""
+                SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+                FROM estabelecimentos_raw 
+                {query_base}
+                ORDER BY nome_fantasia ASC 
+                LIMIT %s OFFSET %s
+            """, tuple(parametros + [por_pagina + 1, offset]))
             
             empresas = cursor.fetchall()
             conn.close()
@@ -130,16 +136,17 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 "pagina_atual": pagina,
                 "tem_proxima": tem_proxima,
                 "nome_buscado": nome,
-                "mensagem": f"Resultados para '{nome}'."
+                "mensagem": f"Resultados para a busca '{nome}'."
             }
 
         return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
+
     except Exception as e:
         if conn: conn.close()
         return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS (ESTRUTURA ORIGINAL)
+# ROTAS PÚBLICAS
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -157,21 +164,17 @@ def index():
             resultado = verificar_empresa(nome, telefone, pagina, uf)
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
-@app.route("/usuario", methods=["GET", "POST"])
-def perfil_usuario():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    resultado_local = None
-    if request.method == "POST":
-        nome = request.form.get("nome", "").strip()
-        telefone = request.form.get("telefone", "").strip()
-        if nome or telefone:
-            resultado_local = verificar_empresa(nome, telefone)
-            pesquisas = session.get('pesquisas_recentes', [])
-            pesquisas.insert(0, resultado_local)
-            session['pesquisas_recentes'] = pesquisas[:5]
-            session.modified = True
-    return render_template("usuario.html", pesquisas=session.get('pesquisas_recentes', []), resultado_modal=resultado_local)
+@app.route("/sobre")
+def sobre():
+    return render_template("sobre.html")
 
+@app.route("/contato")
+def contato():
+    return render_template("contato.html")
+
+# =========================
+# LOGIN E PERFIL
+# =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "usuario_logado" in session: return redirect(url_for('perfil_usuario'))
@@ -180,26 +183,50 @@ def login():
         if request.form.get("usuario") == "admin" and request.form.get("senha") == "123":
             session["usuario_logado"] = "admin"
             return redirect(url_for('perfil_usuario'))
-        erro = "Incorreto."
+        erro = "Usuário ou senha incorretos."
     return render_template("login.html", erro=erro)
+
+@app.route("/usuario", methods=["GET", "POST"])
+def perfil_usuario():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    resultado_local = None
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        telefone = request.form.get("telefone", "").strip()
+        uf = request.form.get("uf", "").strip()
+        if nome or telefone:
+            resultado_local = verificar_empresa(nome, telefone, 1, uf)
+            pesquisas = session.get('pesquisas_recentes', [])
+            pesquisas.insert(0, resultado_local)
+            session['pesquisas_recentes'] = pesquisas[:5]
+            session.modified = True
+    return render_template("usuario.html", pesquisas=session.get('pesquisas_recentes', []), resultado_modal=resultado_local)
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route("/sobre")
-def sobre(): return render_template("sobre.html")
+# =========================
+# ROTAS ESPECÍFICAS (PRESERVADAS)
+# =========================
+@app.route("/historico")
+def historico():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("em_obras.html", pesquisas=pesquisas)
 
-@app.route("/contato")
-def contato(): return render_template("contato.html")
+@app.route("/denuncia")
+def denuncia():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    return render_template("em_obras.html")
 
 # =========================
-# ROTAS ADMIN E COMPATIBILIDADE (FIX ERRO BASE.HTML)
+# ADMINISTRAÇÃO
 # =========================
 @app.route("/admin")
 def admin():
-    """Corrige o erro url_for('admin') e renderiza admin.html"""
+    """Rota para o arquivo admin.html (Resolve erro do base.html)"""
     if "usuario_logado" not in session: return redirect(url_for('login'))
     return render_template("admin.html")
 
@@ -208,41 +235,35 @@ def listar_empresas():
     if "usuario_logado" not in session: return redirect(url_for('login'))
     uf_filtro = request.args.get('uf', '').upper()
     pagina = request.args.get('pagina', 1, type=int)
-    por_pagina = 50
+    por_pagina = 100
+    offset = (pagina - 1) * por_pagina
     conn = conectar()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    where = "WHERE nome_fantasia IS NOT NULL"
-    params = []
-    if uf_filtro:
-        where += " AND uf = %s"; params.append(uf_filtro)
-    
-    cursor.execute(f"SELECT COUNT(*) FROM estabelecimentos_raw {where}", params)
-    total = cursor.fetchone()['count']
-    cursor.execute(f"SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf FROM estabelecimentos_raw {where} ORDER BY nome_fantasia LIMIT %s OFFSET %s", params + [por_pagina, (pagina-1)*por_pagina])
-    empresas = cursor.fetchall()
-    conn.close()
-    return render_template("empresas.html", empresas=empresas, pagina=pagina, total_paginas=(total//por_pagina)+1, uf_atual=uf_filtro)
+    try:
+        where = "WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''"
+        params = []
+        if uf_filtro:
+            where += " AND uf = %s"; params.append(uf_filtro)
+        
+        cursor.execute(f"SELECT COUNT(*) FROM estabelecimentos_raw {where}", params)
+        total_reg = cursor.fetchone()['count']
+        cursor.execute(f"SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf FROM estabelecimentos_raw {where} ORDER BY nome_fantasia ASC LIMIT %s OFFSET %s", params + [por_pagina, offset])
+        empresas = cursor.fetchall()
+        conn.close()
+        return render_template("empresas.html", empresas=empresas, pagina=pagina, total_paginas=(total_reg // por_pagina) + 1, total_registros=total_reg, uf_atual=uf_filtro)
+    except Exception as e:
+        if conn: conn.close()
+        return str(e), 500
 
 @app.route("/admin/empresa/<cnpj_base>")
 def visualizar_empresa(cnpj_base):
     if "usuario_logado" not in session: return redirect(url_for('login'))
     conn = conectar()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj_base = %s", (cnpj_base,))
+    cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj_base = %s LIMIT 1", (str(cnpj_base),))
     empresa = cursor.fetchone()
     conn.close()
     return render_template("detalhes_empresa.html", empresa=empresa)
 
-@app.route("/historico")
-@app.route("/denuncia")
-def em_obras(): return render_template("em_obras.html")
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-#  _____   ______         _        _  __ _____  _____ 
-# |  __ \ |  ____|   /\   | |      | |/ /|_   _|/ ____|
-# | |  | || |__     /  \  | |      | ' /   | | | (___  
-# | |  | ||  __|   / /\ \ | |      |  <    | |  \___ \ 
-# | |__| || |____ / ____ \| |____  | . \  _| |_ ____) |
-# |_____/ |______/_/    \_\______| |_|\_\|_____|_____/
