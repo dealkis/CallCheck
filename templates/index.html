@@ -10,16 +10,24 @@
         </p>
     {% endif %}
 
-    <form method="POST" action="/" class="form-box">
-        <input type="text" name="nome" placeholder="🏢 Nome da empresa" value="{{ request.form.get('nome') or request.args.get('nome', '') }}">
-        <input type="text" name="telefone" placeholder="📞 Telefone" value="{{ request.form.get('telefone') or request.args.get('telefone', '') }}">
-        <button type="submit">Verificar</button>
+    <form method="POST" action="/" class="form-box" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+        <input type="text" name="nome" placeholder="🏢 Nome da empresa" value="{{ request.form.get('nome') or request.args.get('nome', '') }}" style="flex: 2; min-width: 200px;">
+        
+        <input type="text" name="uf" placeholder="📍 UF" maxlength="2" value="{{ request.form.get('uf') or request.args.get('uf', '') or (resultado.uf_buscada if resultado else '') }}" style="width: 60px; text-align: center; text-transform: uppercase;">
+        
+        <input type="text" name="telefone" placeholder="📞 Telefone" value="{{ request.form.get('telefone') or request.args.get('telefone', '') }}" style="flex: 1; min-width: 150px;">
+        
+        <button type="submit" style="min-width: 120px;">Verificar</button>
     </form>
 </section>
 
 {% if resultado %}
 
-    {% if resultado.status == 'LISTA' %}
+    {% if resultado.status == 'ERRO' %}
+        <div class="resultado erro" style="max-width: 800px; margin: 20px auto;">
+            <p><strong>Erro:</strong> {{ resultado.mensagem }}</p>
+        </div>
+    {% elif resultado.status == 'LISTA' %}
     <div class="resultado neutro" style="max-width: 800px; margin: 20px auto; text-align: left;">
         <div class="icone">🏢</div>
         <div class="info">
@@ -31,7 +39,7 @@
                 {% for item in resultado.resultados %}
                 <div style="padding: 10px; border: 1px solid #eee; border-radius: 8px; background: #f9f9f9;">
                     <strong style="font-size: 1.1em; color: #2c3e50;">{{ item.empresa }}</strong> 
-                    <span style="font-size: 0.9em; background: #eee; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">{{ item.uf }}</span>
+                    <span style="font-size: 0.8em; background: #2c3e50; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">{{ item.uf }}</span>
                     <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 0.95em;">
                         {% for tel in item.telefones %}
                             <li>📞 {{ tel }}</li>
@@ -44,7 +52,7 @@
             <!-- CONTROLES DE PAGINAÇÃO OTIMIZADA -->
             <div style="margin-top: 25px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
                 {% if resultado.pagina_atual > 1 %}
-                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual - 1) }}" 
+                    <a href="{{ url_for('index', nome=resultado.nome_buscado, uf=resultado.uf_buscada, pagina=resultado.pagina_atual - 1) }}" 
                        style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
                        ⬅ Anterior
                     </a>
@@ -55,7 +63,7 @@
                 </span>
 
                 {% if resultado.tem_proxima %}
-                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual + 1) }}" 
+                    <a href="{{ url_for('index', nome=resultado.nome_buscado, uf=resultado.uf_buscada, pagina=resultado.pagina_atual + 1) }}" 
                        style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
                        Próxima ➡
                     </a>
@@ -65,44 +73,42 @@
     </div>
 
     {% else %}
-    <!-- RESULTADO ÚNICO (ORIGINAL) -->
+    <!-- RESULTADO ÚNICO -->
     <div class="resultado 
         {% if resultado.status == 'OFICIAL' %}sucesso
         {% elif resultado.status == 'ALERTA' %}alerta
-        {% elif resultado.status == 'CANAIS' %}neutro
+        {% elif resultado.status == 'ENCONTRADO' %}sucesso
         {% else %}erro
         {% endif %}">
         
         <div class="icone">
-            {% if resultado.status == 'OFICIAL' %}✔
+            {% if resultado.status == 'OFICIAL' or resultado.status == 'ENCONTRADO' %}✔
             {% elif resultado.status == 'ALERTA' %}⚠
-            {% elif resultado.status == 'CANAIS' %}🏢
             {% else %}✖
             {% endif %}
         </div>
 
         <div class="info">
             <h3>
-                {% if resultado.status == 'OFICIAL' %}Número Oficial
-                {% elif resultado.status == 'ALERTA' %}Número com denúncias
-                {% elif resultado.status == 'CANAIS' %}Canais Oficiais Registrados
-                {% else %}Número não oficial
+                {% if resultado.status == 'OFICIAL' or resultado.status == 'ENCONTRADO' %}Registro Localizado
+                {% elif resultado.status == 'ALERTA' %}Atenção
+                {% else %}Não localizado
                 {% endif %}
             </h3>
             <p><strong>Status:</strong> {{ resultado.status }}</p>
             {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
             <p>{{ resultado.mensagem }}</p>
             <div class="colunas">
-                {% if resultado.telefones %}
+                {% if resultado.telefones or resultado.telefone %}
                 <div class="coluna">
-                    <strong>📞 Telefones Oficiais</strong>
-                    <ul>{% for tel in resultado.telefones %}<li>{{ tel }}</li>{% endfor %}</ul>
-                </div>
-                {% endif %}
-                {% if resultado.status != 'CANAIS' and resultado.telefone %}
-                <div class="coluna">
-                    <strong>📞 Contato Pesquisado</strong>
-                    <ul><li>{{ resultado.telefone }}</li></ul>
+                    <strong>📞 Dados do Registro</strong>
+                    <ul>
+                        {% if resultado.telefones %}
+                            {% for tel in resultado.telefones %}<li>{{ tel }}</li>{% endfor %}
+                        {% elif resultado.telefone %}
+                            <li>{{ resultado.telefone }}</li>
+                        {% endif %}
+                    </ul>
                 </div>
                 {% endif %}
             </div>
@@ -114,12 +120,6 @@
 
 <style>
     .resultado.neutro { background-color: #ffffff; border: 1px solid #ddd; color: #333; }
-    .resultado.neutro .icone { color: #2c3e50; }
-    
-    /* Ajuste para botões de paginação no hover */
-    .paginacao a:hover {
-        background-color: #34495e !important;
-        opacity: 0.9;
-    }
+    .resultado.erro { background-color: #ffe6e6; border: 1px solid #ff4d4d; color: #333; padding: 20px; border-radius: 8px; text-align: center; }
 </style>
 {% endblock %}
