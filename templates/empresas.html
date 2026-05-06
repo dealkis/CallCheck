@@ -46,15 +46,19 @@
             </div>
         {% endif %}
     </div>
-    <div class="paginacao">
+    <div class="pagination" style="margin-top: 20px; text-align: center;">
         {% if pagina > 1 %}
-            <a href="{{ url_for('listar_empresas', pagina=pagina-1) }}" class="btn-pag">⬅️ Anterior</a>
+            <a href="{{ url_for('listar_empresas', pagina=pagina-1) }}" class="btn">⬅️ Anterior</a>
         {% endif %}
-        
-        <span class="pagina-atual">Página {{ pagina }}</span>
-
-        {% if empresas|length == 100 %}
-            <a href="{{ url_for('listar_empresas', pagina=pagina+1) }}" class="btn-pag">Próxima ➡️</a>
+    
+        <span style="margin: 0 15px;">
+            Página <strong>{{ pagina }}</strong> de <strong>{{ total_paginas }}</strong>
+            <br>
+            <small>({{ total_registros }} empresas em SP)</small>
+        </span>
+    
+        {% if pagina < total_paginas %}
+            <a href="{{ url_for('listar_empresas', pagina=pagina+1) }}" class="btn">Próxima ➡️</a>
         {% endif %}
     </div>
 </div>
