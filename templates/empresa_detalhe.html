@@ -1,43 +1,124 @@
-<h2>Gerenciar Empresa</h2>
+{% extends "base.html" %}
 
-<!-- EDITAR NOME -->
-<form method="POST">
-    <input type="hidden" name="acao" value="editar_nome">
-    <input type="text" name="nome" value="{{ empresa[1] }}">
-    <button type="submit">Salvar Nome</button>
-</form>
+{% block content %}
+<div class="gerenciar-container">
+    <div class="voltar-link">
+        <a href="{{ url_for('listar_empresas') }}">← Voltar para a lista</a>
+    </div>
 
-<hr>
+    <div class="header-gerenciar">
+        <h2>⚙️ Gerenciar: <span class="highlight">{{ empresa[1] }}</span></h2>
+    </div>
 
-<!-- TELEFONES -->
-<h3>Telefones</h3>
+    <div class="grid-gerenciar">
+        <!-- CARD 1: EDITAR NOME -->
+        <div class="card">
+            <h3>Nome da Empresa</h3>
+            <form method="POST" class="form-inline">
+                <input type="hidden" name="acao" value="editar_nome">
+                <input type="text" name="nome" value="{{ empresa[1] }}" required>
+                <button type="submit" class="btn-save">Atualizar Nome</button>
+            </form>
+        </div>
 
-<ul>
-{% for t in telefones %}
-    <li>
-        {{ t[2] }}
-        <form method="POST" style="display:inline;">
-            <input type="hidden" name="acao" value="excluir_telefone">
-            <input type="hidden" name="tel_id" value="{{ t[0] }}">
-            <button type="submit">Excluir</button>
-        </form>
-    </li>
-{% endfor %}
-</ul>
+        <!-- CARD 2: TELEFONES -->
+        <div class="card">
+            <h3>📞 Telefones Vinculados</h3>
+            
+            <ul class="lista-tels">
+                {% for t in telefones %}
+                <li>
+                    <span class="tel-numero">{{ t[2] }}</span>
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="acao" value="excluir_telefone">
+                        <input type="hidden" name="tel_id" value="{{ t[0] }}">
+                        <button type="submit" class="btn-delete-small" title="Excluir Telefone">🗑️</button>
+                    </form>
+                </li>
+                {% else %}
+                <li class="vazio">Nenhum telefone cadastrado.</li>
+                {% endfor %}
+            </ul>
 
-<!-- ADICIONAR TELEFONE -->
-<form method="POST">
-    <input type="hidden" name="acao" value="add_telefone">
-    <input type="text" name="telefone" placeholder="Novo telefone">
-    <button type="submit">Adicionar</button>
-</form>
+            <hr>
 
-<hr>
+            <h4>Adicionar Novo Telefone</h4>
+            <form method="POST" class="form-inline">
+                <input type="hidden" name="acao" value="add_telefone">
+                <input type="text" name="telefone" placeholder="Ex: 11988887777" required>
+                <button type="submit" class="btn-add">Adicionar</button>
+            </form>
+        </div>
 
-<!-- EXCLUIR EMPRESA -->
-<form method="POST">
-    <input type="hidden" name="acao" value="excluir_empresa">
-    <button type="submit" onclick="return confirm('Excluir empresa inteira?')">
-        Excluir Empresa
-    </button>
-</form>
+        <!-- CARD 3: ZONA DE PERIGO (EXCLUIR TUDO) -->
+        <div class="card danger-zone">
+            <h3>⚠️ Zona de Perigo</h3>
+            <p>Ao excluir a empresa, todos os telefones vinculados também serão removidos permanentemente.</p>
+            <form method="POST">
+                <input type="hidden" name="acao" value="excluir_empresa">
+                <button type="submit" class="btn-danger" onclick="return confirm('ATENÇÃO: Deseja excluir esta empresa e todos os seus telefones?')">
+                    Excluir Empresa Inteira
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .gerenciar-container { max-width: 900px; margin: 0 auto; }
+    
+    .voltar-link { margin-bottom: 20px; }
+    .voltar-link a { text-decoration: none; color: #3498db; font-weight: bold; }
+
+    .header-gerenciar h2 { color: #2c3e50; margin-bottom: 30px; }
+    .highlight { color: #3498db; }
+
+    /* Layout em Cartões */
+    .card {
+        background: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+
+    .card h3 { margin-top: 0; font-size: 1.1rem; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+    .card h4 { font-size: 0.9rem; color: #666; margin-top: 20px; }
+
+    /* Formulários e Inputs */
+    .form-inline { display: flex; gap: 10px; }
+    .form-inline input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+
+    /* Botões */
+    button { cursor: pointer; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+    
+    .btn-save { background: #3498db; color: white; padding: 10px 20px; }
+    .btn-save:hover { background: #2980b9; }
+
+    .btn-add { background: #27ae60; color: white; padding: 10px 20px; }
+    .btn-add:hover { background: #219150; }
+
+    .btn-delete-small { background: #f8d7da; color: #721c24; padding: 5px 10px; font-size: 0.8rem; }
+    .btn-delete-small:hover { background: #f5c6cb; }
+
+    .btn-danger { background: #e74c3c; color: white; padding: 12px 20px; width: 100%; margin-top: 10px; }
+    .btn-danger:hover { background: #c0392b; }
+
+    /* Lista de Telefones */
+    .lista-tels { list-style: none; padding: 0; }
+    .lista-tels li { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        padding: 10px; 
+        border-bottom: 1px solid #f9f9f9; 
+    }
+    .tel-numero { font-family: monospace; font-size: 1.1rem; color: #2c3e50; }
+    .vazio { color: #999; font-style: italic; text-align: center; }
+
+    /* Estilo Especial para Zona de Perigo */
+    .danger-zone { border: 1px solid #fab1a0; background: #fffaf9; }
+    .danger-zone h3 { color: #d63031; border-color: #fab1a0; }
+    .danger-zone p { font-size: 0.85rem; color: #636e72; }
+</style>
+{% endblock %}
