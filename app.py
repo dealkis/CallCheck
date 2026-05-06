@@ -10,14 +10,9 @@ app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
 # CONEXÃO
 # =========================
 def conectar():
+    URL_EXTERNA = "postgresql://banco_de_dados_callcheck_user:evZM58eGjtd0qMGoDveRi1DGTvOyd2d7@dpg-d7sdccd0lvsc73ae488g-a.oregon-postgres.render.com/banco_de_dados_callcheck"
     try:
-        return psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            port=os.getenv("DB_PORT")
-        )
+        return psycopg2.connect(URL_EXTERNA)
     except Exception as e:
         print("Erro ao conectar:", e)
         return None
