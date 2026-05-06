@@ -90,8 +90,8 @@
 <!-- CONTEINER PRINCIPAL (DIVIDE A TELA EM DUAS PARTES) -->
 <div class="wrapper">
     
-    <!-- BARRA LATERAL (Só aparece para admin logado) -->
-    {% if session.get('usuario_logado') %}
+    <!-- BARRA LATERAL (Aparece apenas na página de usuário ou páginas de admin) -->
+    {% if request.endpoint in ['perfil_usuario', 'admin', 'listar_empresas', 'historico', 'gerenciar_empresa', 'editar_empresa'] %}
     <aside class="sidebar">
         <a href="{{ url_for('perfil_usuario') }}">🏠 Meu Perfil</a>
         <a href="{{ url_for('admin') }}">➕ Nova Empresa</a>
