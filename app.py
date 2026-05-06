@@ -237,7 +237,6 @@ def listar_empresas():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
 
-    # Pega a página atual da URL (ex: ?pagina=2). Se não tiver, assume 1.
     pagina = request.args.get('pagina', 1, type=int)
     por_pagina = 100
     offset = (pagina - 1) * por_pagina
@@ -245,18 +244,20 @@ def listar_empresas():
     conn = conectar()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # 1. Busca as empresas da página atual
+    # AJUSTE AQUI: Adicionei o 'cnpj' no SELECT para o botão de detalhes funcionar
+    # E adicionei o filtro 'uf = SP' caso você queira manter apenas empresas de SP
     cursor.execute("""
-        SELECT nome_fantasia, ddd1, telefone1, uf 
+        SELECT cnpj, nome_fantasia, ddd1, telefone1, uf 
         FROM estabelecimentos_raw 
-        WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''
+        WHERE nome_fantasia IS NOT NULL 
+          AND nome_fantasia != ''
+          AND uf = 'SP'
         ORDER BY nome_fantasia ASC 
         LIMIT %s OFFSET %s
     """, (por_pagina, offset))
     
     empresas_raw = cursor.fetchall()
 
-    # 2. Formata os telefones
     for emp in empresas_raw:
         emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
 
