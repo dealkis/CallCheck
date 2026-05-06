@@ -81,35 +81,37 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-        # 2. BUSCA POR NOME (PAGINAÇÃO INTELIGENTE + FILTRO UF)
-        if nome:
-            # Trava de Segurança: Evita sobrecarga com nomes curtos
-            if len(nome) < 3:
-                conn.close()
-                return {"status": "ERRO", "mensagem": "Digite pelo menos 3 caracteres para buscar por nome."}
-
-            por_pagina = 10
-            offset = (pagina - 1) * por_pagina
-            limite_busca = por_pagina + 1 
-            regex_busca = f'\\y{nome}\\y'
-
-            # Construção Dinâmica da Query
-            query_base = "WHERE nome_fantasia ~* %s"
-            parametros = [regex_busca]
-
-            if uf and uf.strip():
-                query_base += " AND uf = %s"
-                parametros.append(uf.strip().upper())
-
-            cursor.execute(f"""
-                SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
-                FROM estabelecimentos_raw 
-                {query_base}
-                ORDER BY nome_fantasia ASC 
-                LIMIT %s OFFSET %s
-            """, tuple(parametros + [limite_busca, offset]))
+            # 2. BUSCA POR NOME (OTIMIZADA PARA VELOCIDADE MÁXIMA)
+                    if nome:
+                        if len(nome) < 3:
+                            conn.close()
+                            return {"status": "ERRO", "mensagem": "Digite pelo menos 3 caracteres."}
             
-            empresas_encontradas = cursor.fetchall()
+                        por_pagina = 10
+                        offset = (pagina - 1) * por_pagina
+                        limite_busca = por_pagina + 1 
+            
+                        # MUDANÇA CRUCIAL: Usamos ILIKE com % apenas no final.
+                        # Isso permite que o banco use índices e pare de procurar assim que achar os 10 primeiros.
+                        # Se você pesquisar "MAGALU", ele acha "MAGALU LTDA", "MAGALU S.A", etc.
+                        termo_busca = f"{nome}%"
+            
+                        query_base = "WHERE nome_fantasia ILIKE %s"
+                        parametros = [termo_busca]
+            
+                        if uf and uf.strip():
+                            query_base += " AND uf = %s"
+                            parametros.append(uf.strip().upper())
+            
+                        cursor.execute(f"""
+                            SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+                            FROM estabelecimentos_raw 
+                            {query_base}
+                            ORDER BY nome_fantasia ASC 
+                            LIMIT %s OFFSET %s
+                        """, tuple(parametros + [limite_busca, offset]))
+                        
+                        empresas_encontradas = cursor.fetchall()
 
             if not empresas_encontradas and pagina == 1:
                 conn.close()
