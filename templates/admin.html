@@ -1,21 +1,88 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Painel Admin</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h2>Cadastrar Empresa</h2>
+{% block content %}
+<div class="admin-container">
+    <h2>🛠️ Painel Administrativo</h2>
+    <p>Utilize o formulário abaixo para cadastrar novas empresas e telefones oficiais no banco de dados.</p>
 
-<form method="POST">
-    <input type="text" name="nome" placeholder="Nome da empresa" required><br><br>
-    <input type="text" name="telefone" placeholder="Telefone"><br><br>
-    <button type="submit">Cadastrar</button>
-</form>
+    <div class="form-box">
+        <h3>Cadastrar Empresa</h3>
+        
+        <form method="POST">
+            <input type="text" name="nome" placeholder="Nome da empresa" required>
+            <br>
+            <input type="text" name="telefone" placeholder="Telefone (ex: 11999999999)">
+            <br>
+            <button type="submit">Cadastrar no Sistema</button>
+        </form>
 
-{% if mensagem %}
-    <p>{{ mensagem }}</p>
-{% endif %}
+        {% if mensagem %}
+            <div class="mensagem-sucesso">
+                ✅ {{ mensagem }}
+            </div>
+        {% endif %}
+    </div>
+</div>
 
-</body>
-</html>
+<style>
+    .admin-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .admin-container h2 {
+        color: #2c3e50;
+        border-bottom: 2px solid #ddd;
+        padding-bottom: 10px;
+    }
+
+    /* Reutilizando e melhorando o estilo do form-box */
+    .form-box {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        margin-top: 20px;
+    }
+
+    .form-box h3 {
+        margin-top: 0;
+        color: #333;
+    }
+
+    .form-box input {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-sizing: border-box; /* Garante que o padding não quebre a largura */
+    }
+
+    .form-box button {
+        width: 100%;
+        padding: 12px;
+        background: #27ae60;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .form-box button:hover {
+        background: #219150;
+    }
+
+    .mensagem-sucesso {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #d4edda;
+        color: #155724;
+        border-radius: 5px;
+        border: 1px solid #c3e6cb;
+        text-align: center;
+    }
+</style>
+{% endblock %}
