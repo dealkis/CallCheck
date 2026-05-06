@@ -3,28 +3,36 @@
 {% block content %}
 <div class="lista-container">
     <div class="header-lista">
-        <h2>📋 Empresas Cadastradas</h2>
-        <p>Abaixo estão todas as empresas registradas no CallCheck. Você pode gerenciar telefones ou excluir registros.</p>
+        <h2>📋 Empresas da Base Oficial</h2>
+        <p>Abaixo estão as empresas localizadas na base de dados. Os telefones foram formatados automaticamente.</p>
     </div>
 
     <div class="tabela-box">
         <table class="tabela-admin">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>UF</th>
                     <th>Nome da Empresa</th>
+                    <th>Telefone Oficial</th>
                     <th style="text-align: center;">Ações</th>
                 </tr>
             </thead>
             <tbody>
                 {% for e in empresas %}
                 <tr>
-                    <td><span class="badge-id">#{{ e[0] }}</span></td>
-                    <td class="empresa-nome">{{ e[1] }}</td>
+                    <!-- UF em destaque -->
+                    <td><span class="badge-id">{{ e.uf }}</span></td>
+                    
+                    <!-- Nome Fantasia vindo do banco -->
+                    <td class="empresa-nome">{{ e.nome_fantasia if e.nome_fantasia else 'RAZÃO SOCIAL DISPONÍVEL' }}</td>
+                    
+                    <!-- Telefone já formatado pelo Python -->
+                    <td class="telefone-col">{{ e.telefone_formatado }}</td>
+
                     <td class="acoes">
-                        <a href="{{ url_for('gerenciar_empresa', id=e[0]) }}" class="btn-gerenciar">
-                            ⚙️ Gerenciar
-                        </a>
+                        <!-- Botão ajustado: como não temos um ID numérico simples da Receita aqui, 
+                             poderíamos usar o CNPJ se ele estivesse no SELECT, mas para visualização rápida: -->
+                        <span class="status-badge">Oficial</span>
                     </td>
                 </tr>
                 {% endfor %}
@@ -33,16 +41,17 @@
         
         {% if not empresas %}
             <div class="sem-dados">
-                <p>Nenhuma empresa cadastrada no momento.</p>
-                <a href="{{ url_for('admin') }}">Cadastrar a primeira</a>
+                <p>Nenhuma empresa encontrada nos registros atuais.</p>
+                <a href="{{ url_for('index') }}">Voltar para pesquisa</a>
             </div>
         {% endif %}
     </div>
 </div>
 
 <style>
+    /* Seus estilos originais mantidos com pequenos ajustes */
     .lista-container {
-        max-width: 900px;
+        max-width: 1000px;
         margin: 0 auto;
     }
 
@@ -60,15 +69,13 @@
         margin: 0;
     }
 
-    /* Caixa que envolve a tabela */
     .tabela-box {
         background: white;
         border-radius: 10px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        overflow: hidden; /* Garante que as bordas da tabela sigam o arredondamento */
+        overflow: hidden;
     }
 
-    /* Estilização da Tabela */
     .tabela-admin {
         width: 100%;
         border-collapse: collapse;
@@ -85,7 +92,7 @@
         color: #333;
         font-weight: bold;
         text-transform: uppercase;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
     }
 
     .tabela-admin td {
@@ -94,17 +101,17 @@
         color: #444;
     }
 
-    /* Efeito de hover na linha */
     .tabela-admin tbody tr:hover {
         background-color: #fcfcfc;
     }
 
     .badge-id {
-        background: #eee;
-        padding: 4px 8px;
+        background: #3498db;
+        color: white;
+        padding: 4px 10px;
         border-radius: 4px;
-        font-family: monospace;
-        color: #666;
+        font-weight: bold;
+        font-size: 0.8rem;
     }
 
     .empresa-nome {
@@ -112,36 +119,30 @@
         color: #2c3e50;
     }
 
-    /* Botões de Ação */
+    .telefone-col {
+        font-family: 'Courier New', Courier, monospace;
+        color: #27ae60;
+        font-weight: bold;
+    }
+
+    .status-badge {
+        background: #e8f5e9;
+        color: #2e7d32;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
     .acoes {
         text-align: center;
-    }
-
-    .btn-gerenciar {
-        display: inline-block;
-        padding: 8px 16px;
-        background-color: #3498db;
-        color: white;
-        text-decoration: none;
-        border-radius: 5px;
-        font-size: 0.9rem;
-        transition: background 0.3s;
-    }
-
-    .btn-gerenciar:hover {
-        background-color: #2980b9;
     }
 
     .sem-dados {
         padding: 40px;
         text-align: center;
         color: #999;
-    }
-
-    .sem-dados a {
-        color: #3498db;
-        text-decoration: none;
-        font-weight: bold;
     }
 </style>
 {% endblock %}
