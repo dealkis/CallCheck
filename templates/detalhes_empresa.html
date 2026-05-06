@@ -1,9 +1,67 @@
-.btn-ver {
-    background-color: #3498db;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 0.85rem;
-}
-.btn-ver:hover { background-color: #2980b9; }
+{% extends "base.html" %}
+
+{% block content %}
+<div class="detalhes-container">
+    <div class="header-acoes">
+        <a href="{{ url_for('listar_empresas') }}" class="btn-voltar">⬅️ Voltar para Lista</a>
+        <h2>Ficha Completa: {{ empresa.nome_fantasia or empresa.razao_social }}</h2>
+    </div>
+
+    <div class="info-grid">
+        {% for chave, valor in empresa.items() %}
+        <div class="info-card">
+            <label>{{ chave | replace('_', ' ') | upper }}</label>
+            <p>{{ valor if valor else "---" }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .detalhes-container { max-width: 1200px; margin: 20px auto; padding: 20px; }
+    
+    .header-acoes { 
+        display: flex; 
+        align-items: center; 
+        gap: 20px; 
+        margin-bottom: 30px; 
+    }
+
+    .btn-voltar {
+        text-decoration: none;
+        background: #95a5a6;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 5px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 15px;
+    }
+
+    .info-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border-left: 4px solid #3498db;
+    }
+
+    .info-card label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: bold;
+        color: #7f8c8d;
+        margin-bottom: 5px;
+    }
+
+    .info-card p {
+        margin: 0;
+        color: #2c3e50;
+        font-family: monospace;
+        word-break: break-all;
+    }
+</style>
+{% endblock %}
