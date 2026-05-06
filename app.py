@@ -248,10 +248,9 @@ def listar_empresas():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Tentamos buscar o CNPJ. Se der erro de coluna, o log do servidor avisará.
-        # Adicionei o filtro de SP conforme conversamos.
+        # ALTERADO: cnpj para cnpj_base
         cursor.execute("""
-            SELECT cnpj, nome_fantasia, ddd1, telefone1, uf 
+            SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf 
             FROM estabelecimentos_raw 
             WHERE nome_fantasia IS NOT NULL 
               AND nome_fantasia != ''
@@ -270,12 +269,11 @@ def listar_empresas():
 
     except Exception as e:
         if conn: conn.close()
-        # Isso vai imprimir o erro real no console para você ler
         print(f"ERRO NO SQL: {e}")
         return f"Erro interno no banco de dados: {e}", 500
 
-@app.route("/admin/empresa/<cnpj>")
-def visualizar_empresa(cnpj):
+@app.route("/admin/empresa/<cnpj_base>")
+def visualizar_empresa(cnpj_base):
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
 
@@ -286,8 +284,8 @@ def visualizar_empresa(cnpj):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Buscamos usando %s para o psycopg2 tratar o CNPJ corretamente como string
-        cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj = %s", (str(cnpj),))
+        # ALTERADO: Busca por cnpj_base
+        cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj_base = %s LIMIT 1", (str(cnpj_base),))
         empresa = cursor.fetchone()
         conn.close()
 
