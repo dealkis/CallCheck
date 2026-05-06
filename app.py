@@ -204,7 +204,7 @@ def admin():
         mensagem = "Funcionalidade de cadastro manual em manutenção (Base Receita Ativa)."
     return render_template("admin.html", mensagem=mensagem)
 
-@app.route("/admin/empresas")
+@app.route("empresas")
 def listar_empresas():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
