@@ -237,25 +237,36 @@ def listar_empresas():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
 
+    # Pega a página atual da URL (ex: ?pagina=2). Se não tiver, assume 1.
+    pagina = request.args.get('pagina', 1, type=int)
+    por_pagina = 100
+    offset = (pagina - 1) * por_pagina
+
     conn = conectar()
-    if not conn: return "Erro de conexão"
-    
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
+    # 1. Busca as empresas da página atual
     cursor.execute("""
         SELECT nome_fantasia, ddd1, telefone1, uf 
         FROM estabelecimentos_raw 
         WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''
         ORDER BY nome_fantasia ASC 
-        LIMIT 100
-    """)
+        LIMIT %s OFFSET %s
+    """, (por_pagina, offset))
+    
     empresas_raw = cursor.fetchall()
-    conn.close()
 
+    # 2. Formata os telefones
     for emp in empresas_raw:
         emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
 
-    return render_template("empresas.html", empresas=empresas_raw)
+    conn.close()
+
+    return render_template("empresas.html", 
+                           empresas=empresas_raw, 
+                           pagina=pagina)
+
+#-----#
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
