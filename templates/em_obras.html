@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-obras">
+    <div class="worker-animation">
+        <span class="emoji-worker">👷‍♂️</span>
+        <span class="emoji-tools">🔨🚧</span>
+    </div>
+    
+    <h1>Eita! Ainda estamos em obras por aqui...</h1>
+    <p>Nossos desenvolvedores estão martelando o código e apertando os parafusos desta página.</p>
+    
+    <div class="alerta-obra">
+        <strong>Aviso:</strong> É obrigatório o uso de capacete (e paciência) nesta área!
+    </div>
+
+    <a href="{{ url_for('index') }}" class="btn-retorno">Me tire daqui (Voltar ao Início)</a>
+</div>
+
+<style>
+    .container-obras {
+        text-align: center;
+        padding: 50px 20px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        max-width: 600px;
+        margin: 40px auto;
+        border-top: 10px solid #f1c40f; /* Amarelo alerta */
+    }
+
+    .worker-animation {
+        font-size: 80px;
+        margin-bottom: 20px;
+        display: block;
+    }
+
+    .emoji-tools {
+        font-size: 40px;
+        position: relative;
+        top: -10px;
+    }
+
+    h1 {
+        color: #2c3e50;
+        margin-bottom: 15px;
+    }
+
+    p {
+        color: #7f8c8d;
+        font-size: 1.1rem;
+        line-height: 1.6;
+    }
+
+    .alerta-obra {
+        background: #fff3cd;
+        color: #856404;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 25px 0;
+        border: 1px dashed #ffeeba;
+        font-size: 0.9rem;
+    }
+
+    .btn-retorno {
+        display: inline-block;
+        padding: 12px 25px;
+        background: #2c3e50;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: transform 0.2s, background 0.2s;
+    }
+
+    .btn-retorno:hover {
+        background: #34495e;
+        transform: scale(1.05);
+    }
+
+    /* Uma animaçãozinha simples para o martelo */
+    @keyframes martelar {
+        0% { transform: rotate(0deg); }
+        50% { transform: rotate(-20deg); }
+        100% { transform: rotate(0deg); }
+    }
+    
+    .emoji-worker {
+        display: inline-block;
+        animation: martelar 1s infinite;
+    }
+</style>
+{% endblock %}
