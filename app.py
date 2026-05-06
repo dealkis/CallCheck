@@ -290,6 +290,12 @@ def historico():
     pesquisas = session.get('pesquisas_recentes', [])
     return render_template("em_obras.html", pesquisas=pesquisas)
 
+@app.route("/denuncia")
+def historico():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+    return render_template("em_obras.html")
+
 # =========================
 # ADMIN (PROTEGER!)
 # =========================
