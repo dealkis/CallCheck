@@ -23,7 +23,7 @@
     <div class="resultado neutro" style="max-width: 800px; margin: 20px auto; text-align: left;">
         <div class="icone">🏢</div>
         <div class="info">
-            <h3>Empresas Encontradas ({{ resultado.total_resultados }})</h3>
+            <h3>Empresas Encontradas</h3>
             <p>{{ resultado.mensagem }}</p>
             <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0;">
             
@@ -41,16 +41,24 @@
                 {% endfor %}
             </div>
 
-            <!-- CONTROLES DE PAGINAÇÃO -->
+            <!-- CONTROLES DE PAGINAÇÃO OTIMIZADA -->
             <div style="margin-top: 25px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
                 {% if resultado.pagina_atual > 1 %}
-                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual - 1) }}" style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none;">⬅ Anterior</a>
+                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual - 1) }}" 
+                       style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                       ⬅ Anterior
+                    </a>
                 {% endif %}
 
-                <span style="font-weight: bold;">Página {{ resultado.pagina_atual }} de {{ resultado.total_paginas }}</span>
+                <span style="font-weight: bold; background: #eee; padding: 8px 15px; border-radius: 5px;">
+                    Página {{ resultado.pagina_atual }}
+                </span>
 
-                {% if resultado.pagina_atual < resultado.total_paginas %}
-                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual + 1) }}" style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none;">Próxima ➡</a>
+                {% if resultado.tem_proxima %}
+                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual + 1) }}" 
+                       style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                       Próxima ➡
+                    </a>
                 {% endif %}
             </div>
         </div>
@@ -107,5 +115,11 @@
 <style>
     .resultado.neutro { background-color: #ffffff; border: 1px solid #ddd; color: #333; }
     .resultado.neutro .icone { color: #2c3e50; }
+    
+    /* Ajuste para botões de paginação no hover */
+    .paginacao a:hover {
+        background-color: #34495e !important;
+        opacity: 0.9;
+    }
 </style>
 {% endblock %}
