@@ -1,71 +1,69 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="hero">
+<section class="hero" style="padding-bottom: 20px;">
     <h1>Bem-vindo, {{ session['usuario_logado'] }}!</h1>
     <p>Você está conectado ao painel de controle do CallCheck.</p>
 </section>
 
-<div class="resultado" style="display: flex; flex-direction: column; width: 80%; margin: 20px auto; padding: 20px; border-radius: 12px; background-color: #f9f9f9; border: 1px solid #ddd;">
+<div style="display: flex; flex-direction: column; width: 85%; margin: 0 auto; padding: 30px; border-radius: 12px; background-color: #f9f9f9; border: 2px solid #ddd; font-size: 1.1em;">
     
-    <div class="info" style="background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
+    <div class="info" style="background: #fff; padding: 40px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
         
-        <h2 style="margin-top: 0;">Painel do Usuário (Projeto ACEX)</h2>
-        <hr style="border: 0; border-top: 1px solid #ddd; margin-bottom: 25px;">
+        <h2 style="margin-top: 0; font-size: 1.8em;">Painel do Usuário (Projeto ACEX)</h2>
+        <hr style="border: 0; border-top: 2px solid #ddd; margin-bottom: 30px;">
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
             
-            <!-- Bloco de Estatísticas -->
-            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fafafa;">
+            <div style="padding: 25px; border: 2px solid #eee; border-radius: 10px; background: #fafafa;">
                 <h3 style="margin-top: 0;">📊 Estatísticas</h3>
                 <p>Consultas realizadas hoje: <strong>{{ pesquisas|length }}</strong></p>
-                <p>Status da conta: <strong style="color: green;">Ativa</strong></p>
-                <p style="font-size: 0.85em; color: #666; margin-top: 15px;">Seu nível de segurança: <span style="color: green; font-weight: bold;">Alto</span></p>
+                <p>Status da conta: <strong style="color: #28a745;">Ativa</strong></p>
+                <p style="font-size: 0.95em; color: #555; margin-top: 20px;">Seu nível de segurança: <span style="color: #28a745; font-weight: bold;">Alto</span></p>
             </div>
 
-            <!-- Bloco de Pesquisa -->
-            <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px; background: #fff;">
+            <div style="padding: 25px; border: 2px solid #eee; border-radius: 10px; background: #fff;">
                 <h3 style="margin-top: 0;">🔍 Nova Verificação</h3>
-                <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">Pesquise por nome ou telefone:</p>
+                <p style="font-size: 0.95em; color: #555; margin-bottom: 20px;">Pesquise por nome ou telefone:</p>
                 
                <form id="formPesquisa" method="POST" class="form-box">
-                    <input type="text" id="nome" name="nome" placeholder="🏢 Nome da empresa" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="text" id="nome" name="nome" placeholder="🏢 Nome da empresa" style="width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #ccc; border-radius: 8px; box-sizing: border-box;">
                     
                     <input type="text" id="telefone" name="telefone" 
                         placeholder="📞 (00) 00000-0000" 
                         maxlength="15" 
                         oninput="mascaraTelefone(this)"
-                        style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                        style="width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #ccc; border-radius: 8px; box-sizing: border-box;">
                 
-                    <p id="avisoErro" style="display: none; color: #d93025; font-size: 0.9em; margin-bottom: 10px; font-weight: bold;">
+                    <p id="avisoErro" style="display: none; color: #dc3545; font-size: 1em; margin-bottom: 15px; font-weight: bold;">
                         ⚠️ Por favor, preencha o nome ou o telefone.
                     </p>
                     
-                    <button type="button" onclick="validarBusca()" style="width: 100%; background: #000; color: #fff; padding: 10px; border: none; border-radius: 5px; cursor: pointer;">Verificar</button>
+                    <button type="button" onclick="validarBusca()" style="width: 100%; background: #000; color: #fff; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1em; font-weight: bold;">Verificar</button>
                 </form>
             </div>
         </div>
 
-        <!-- HISTÓRICO RECENTE -->
-        <div style="margin-top: 40px;">
-            <h3 style="border-bottom: 2px solid #000; display: inline-block; padding-bottom: 5px;">🕒 Histórico Recente</h3>
+        <div style="margin-top: 50px;">
+            <h3 style="border-bottom: 3px solid #000; display: inline-block; padding-bottom: 8px; font-size: 1.5em;">🕒 Histórico Recente</h3>
             
             {% if pesquisas %}
-                <ul style="list-style-type: none; padding: 0; margin-top: 20px;">
+                <ul style="list-style-type: none; padding: 0; margin-top: 25px;">
                     {% for item in pesquisas %}
-                        <li style="background: #fff; padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #eee; 
-                            border-left: 6px solid {% if item.status == 'OFICIAL' %}#28a745{% elif item.status == 'LISTA' %}#2c3e50{% else %}#dc3545{% endif %}; 
-                            box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
+                        <li style="background: #fff; padding: 20px; margin-bottom: 15px; border-radius: 10px; border: 2px solid #eee; 
+                            border-left: 8px solid {% if item.status in ['OFICIAL', 'ENCONTRADO'] %}#28a745{% elif item.status in ['NAO_OFICIAL', 'NAO_ENCONTRADO', 'ALERTA'] %}#ffc107{% elif item.status == 'RISCO' %}#dc3545{% else %}#6c757d{% endif %}; 
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
                             
                             <div>
-                                <strong>{{ item.empresa or "Busca por Número" }}</strong><br>
-                                <small style="color: #666;">{{ item.telefone or "Múltiplos canais" }}</small>
+                                <strong style="font-size: 1.2em;">{{ item.empresa or "Busca por Número" }}</strong><br>
+                                <small style="color: #666; font-size: 1em; font-weight: bold;">{{ item.telefone or "Múltiplos canais" }}</small>
                             </div>
                             
                             <div class="status-container">
-                                <span style="background: {% if item.status == 'OFICIAL' %}#d4edda{% elif item.status == 'LISTA' %}#e9ecef{% else %}#f8d7da{% endif %}; 
-                                             color: {% if item.status == 'OFICIAL' %}#155724{% elif item.status == 'LISTA' %}#2c3e50{% else %}#721c24{% endif %}; 
-                                             padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold;">
+                                <span style="
+                                    background: {% if item.status in ['OFICIAL', 'ENCONTRADO'] %}#d4edda{% elif item.status in ['NAO_OFICIAL', 'NAO_ENCONTRADO', 'ALERTA'] %}#fff3cd{% elif item.status == 'RISCO' %}#f8d7da{% else %}#e2e3e5{% endif %}; 
+                                    color: {% if item.status in ['OFICIAL', 'ENCONTRADO'] %}#155724{% elif item.status in ['NAO_OFICIAL', 'NAO_ENCONTRADO', 'ALERTA'] %}#856404{% elif item.status == 'RISCO' %}#721c24{% else %}#383d41{% endif %}; 
+                                    padding: 8px 16px; border-radius: 20px; font-size: 0.95em; font-weight: bold;">
                                     {{ item.status }}
                                 </span>
                             </div>
@@ -73,7 +71,7 @@
                     {% endfor %}
                 </ul> 
             {% else %}
-                <div style="text-align: center; padding: 40px; color: #888; background: #fdfdfd; border-radius: 8px; margin-top: 20px; border: 2px dashed #eee;">
+                <div style="text-align: center; padding: 50px; color: #777; background: #fdfdfd; border-radius: 10px; margin-top: 30px; border: 3px dashed #ddd; font-size: 1.2em;">
                     <p>Nenhuma consulta realizada recentemente.</p>
                 </div>
             {% endif %}
@@ -81,35 +79,38 @@
     </div>
 </div>
 
-<!-- MODAL DE RESULTADO DINÂMICO -->
 {% if resultado_modal %}
 <div class="modal-overlay" id="modalResultado">
     <div class="modal-box">
         <span class="close-btn" onclick="fecharModal()">×</span>
         
-        <div style="font-size: 40px; margin-bottom: 10px;">
-            {% if resultado_modal.status == 'LISTA' %} 🏢 {% elif resultado_modal.status == 'OFICIAL' %} ✅ {% else %} ❌ {% endif %}
+        <div style="font-size: 60px; margin-bottom: 15px;">
+            {% if resultado_modal.status in ['OFICIAL', 'ENCONTRADO'] %} 🟢
+            {% elif resultado_modal.status in ['ALERTA', 'NAO_OFICIAL', 'NAO_ENCONTRADO'] %} 🟡
+            {% elif resultado_modal.status == 'RISCO' %} 🔴
+            {% else %} 🏢
+            {% endif %}
         </div>
         
-        <h3 style="margin-bottom: 15px;">{{ resultado_modal.mensagem }}</h3>
+        <h3 style="margin-bottom: 20px; font-size: 1.4em;">{{ resultado_modal.mensagem }}</h3>
 
-        <div style="text-align: left; background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+        <div style="text-align: left; background: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 20px; font-size: 1.1em; border: 1px solid #ddd;">
             {% if resultado_modal.status == 'LISTA' %}
                 <p><strong>Resultados encontrados:</strong></p>
                 {% for emp in resultado_modal.resultados %}
-                    <div style="border-bottom: 1px solid #eee; padding: 5px 0;">
+                    <div style="border-bottom: 2px solid #eee; padding: 10px 0;">
                         <strong>{{ emp.empresa }}</strong><br>
-                        <small>{{ emp.telefones|join(', ') }} ({{ emp.uf }})</small>
+                        <small style="font-weight: bold;">{{ emp.telefones|join(', ') }} ({{ emp.uf }})</small>
                     </div>
                 {% endfor %}
             {% else %}
                 <p><strong>Empresa:</strong> {{ resultado_modal.empresa or "Não identificada" }}</p>
-                <p><strong>Telefone:</strong> {{ resultado_modal.telefone }}</p>
+                <p><strong>Telefone:</strong> <span style="font-weight: bold;">{{ resultado_modal.telefone }}</span></p>
                 <p><strong>UF:</strong> {{ resultado_modal.uf or "N/A" }}</p>
             {% endif %}
         </div>
         
-        <button onclick="fecharModal()" style="background: #000; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; width: 100%;">Fechar</button>
+        <button onclick="fecharModal()" style="background: #000; color: #fff; border: none; padding: 15px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1.2em; font-weight: bold;">Fechar</button>
     </div>
 </div>
 {% endif %}
@@ -126,7 +127,8 @@
     }
 
     function fecharModal() {
-        document.getElementById('modalResultado').style.display = 'none';
+        var m = document.getElementById('modalResultado');
+        if (m) m.style.display = 'none';
     }
 
     function mascaraTelefone(input) {
@@ -141,8 +143,9 @@
 </script>
 
 <style>
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-    .modal-box { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; position: relative; max-height: 80vh; overflow-y: auto; }
-    .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; }
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-box { background: white; padding: 35px; border-radius: 15px; width: 90%; max-width: 500px; text-align: center; position: relative; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .close-btn { position: absolute; top: 15px; right: 20px; font-size: 30px; cursor: pointer; color: #555; }
+    .close-btn:hover { color: #000; }
 </style>
 {% endblock %}
