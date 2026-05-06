@@ -265,5 +265,32 @@ def visualizar_empresa(cnpj_base):
     conn.close()
     return render_template("detalhes_empresa.html", empresa=empresa)
 
+@app.route("/database_view")
+def database_view():
+    # Segurança: Apenas quem está logado pode ver o banco bruto
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+    
+    conn = conectar()
+    if conn is None:
+        return "Erro ao conectar ao banco de dados.", 500
+    
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # Seleciona as colunas principais para não sobrecarregar a página
+        cursor.execute("""
+            SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf 
+            FROM estabelecimentos_raw 
+            WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''
+            LIMIT 100
+        """)
+        registros = cursor.fetchall()
+        conn.close()
+        
+        return render_template("database_view.html", registros=registros)
+    except Exception as e:
+        if conn: conn.close()
+        return f"Erro na consulta: {str(e)}", 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
