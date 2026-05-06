@@ -41,7 +41,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO (OTIMIZADA PARA PARADA PRECOCE)
+# VERIFICAÇÃO (OTIMIZADA PARA PARADA PRECOCE E INDICE GIN)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     conn = conectar()
@@ -81,7 +81,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-        # 2. BUSCA POR NOME (ILIKE NO INÍCIO + OFFSET)
+        # 2. BUSCA POR NOME (OTIMIZADO COM GIN TRGM ILIKE)
         if nome:
             if len(nome) < 3:
                 conn.close()
@@ -91,8 +91,8 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             offset = (pagina - 1) * por_pagina
             limite_busca = por_pagina + 1 
             
-            # Mudança para busca por início da palavra (Index-Friendly)
-            termo_busca = f"{nome}%"
+            # Aproveitando o poder do GIN pg_trgm, a busca pode ser em qualquer parte da string sem perder performance
+            termo_busca = f"%{nome}%"
 
             query_base = "WHERE nome_fantasia ILIKE %s"
             parametros = [termo_busca]
@@ -113,7 +113,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
             if not empresas_encontradas and pagina == 1:
                 conn.close()
-                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa encontrada com este início de nome."}
+                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa encontrada com este nome."}
 
             tem_proxima = len(empresas_encontradas) > por_pagina
             if tem_proxima:
@@ -155,7 +155,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 "tem_proxima": tem_proxima,
                 "nome_buscado": nome,
                 "uf_buscada": uf,
-                "mensagem": f"Resultados para nomes que começam com '{nome}'."
+                "mensagem": f"Resultados para a busca '{nome}'."
             }
 
         return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
-#  _____   ______          _        _  __ _____  _____ 
+#  _____   ______         _        _  __ _____  _____ 
 # |  __ \ |  ____|   /\   | |      | |/ /|_   _|/ ____|
 # | |  | || |__     /  \  | |      | ' /   | | | (___  
 # | |  | ||  __|   / /\ \ | |      |  <    | |  \___ \ 
