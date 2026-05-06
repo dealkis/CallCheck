@@ -30,7 +30,7 @@
                     <td class="telefone-col">{{ e.telefone_formatado }}</td>
 
                     <td class="acoes">
-                        <a href="{{ url_for('visualizar_empresa', cnpj=e.cnpj) }}" class="btn-ver">
+                        <a href="{{ url_for('visualizar_empresa', cnpj_base=e.cnpj_base) }}" class="btn-ver">
                             🔍 Detalhes
                         </a>
                     </td>
