@@ -291,7 +291,7 @@ def historico():
     return render_template("em_obras.html", pesquisas=pesquisas)
 
 @app.route("/denuncia")
-def historico():
+def denuncia():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
     return render_template("em_obras.html")
