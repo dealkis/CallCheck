@@ -237,6 +237,8 @@ def listar_empresas():
     if "usuario_logado" not in session:
         return redirect(url_for('login'))
 
+    # 1. Captura os parâmetros da URL
+    uf_filtro = request.args.get('uf', '').upper()
     pagina = request.args.get('pagina', 1, type=int)
     por_pagina = 100
     offset = (pagina - 1) * por_pagina
@@ -248,44 +250,58 @@ def listar_empresas():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # 1. PEGAR O TOTAL FILTRADO (Apenas SP e com Nome)
-        # Como supervisor, você sabe que o COUNT demora um pouco, 
-        # mas aqui é necessário para saber o fim da lista.
-        cursor.execute("""
-            SELECT COUNT(*) FROM estabelecimentos_raw 
-            WHERE nome_fantasia IS NOT NULL AND nome_fantasia != '' AND uf = 'SP'
-        """)
+        # 2. Construção da Query com Filtro Dinâmico
+        # Começamos com a base que limpa nomes nulos
+        base_where = "WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''"
+        params_contagem = []
+        
+        if uf_filtro:
+            base_where += " AND uf = %s"
+            params_contagem.append(uf_filtro)
+
+        # 3. Executa a Contagem Total (para a paginação)
+        sql_count = f"SELECT COUNT(*) FROM estabelecimentos_raw {base_where}"
+        cursor.execute(sql_count, params_contagem)
         total_registros = cursor.fetchone()['count']
         
-        # Cálculo do total de páginas
+        # Cálculo matemático de páginas
         total_paginas = (total_registros + por_pagina - 1) // por_pagina
 
-        # 2. BUSCAR OS DADOS DA PÁGINA
-        cursor.execute("""
+        # 4. Busca os dados da página atual
+        # Note que passamos os parâmetros da contagem + por_pagina e offset
+        sql_dados = f"""
             SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf 
             FROM estabelecimentos_raw 
-            WHERE nome_fantasia IS NOT NULL 
-              AND nome_fantasia != ''
+            {base_where}
             ORDER BY nome_fantasia ASC 
             LIMIT %s OFFSET %s
-        """, (por_pagina, offset))
+        """
+        params_dados = params_contagem + [por_pagina, offset]
+        cursor.execute(sql_dados, params_dados)
         
         empresas_raw = cursor.fetchall()
 
+        # 5. Formata os telefones para exibição
         for emp in empresas_raw:
-            emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
+            # Garantimos que os dados existem antes de formatar
+            ddd = emp.get('ddd1') or ""
+            tel = emp.get('telefone1') or ""
+            emp['telefone_formatado'] = formatar_telefone(ddd, tel)
 
+        cursor.close()
         conn.close()
-        
-        # Passamos 'total_paginas' para o HTML
+
+        # 6. Renderiza o template passando todas as variáveis necessárias
         return render_template("empresas.html", 
                                empresas=empresas_raw, 
                                pagina=pagina, 
                                total_paginas=total_paginas,
-                               total_registros=total_registros)
+                               total_registros=total_registros,
+                               uf_atual=uf_filtro)
 
     except Exception as e:
-        if conn: conn.close()
+        if conn:
+            conn.close()
         print(f"ERRO NO SQL: {e}")
         return f"Erro interno no banco de dados: {e}", 500
 
