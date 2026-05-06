@@ -41,7 +41,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO (OTIMIZADA PARA PARADA PRECOCE E INDICE GIN)
+# VERIFICAÇÃO (OTIMIZADA PARA OS 3 CENÁRIOS DE BUSCA)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     conn = conectar()
@@ -52,8 +52,50 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         telefone_limpo = limpar_telefone(telefone)
 
-        # 1. BUSCA POR TELEFONE
-        if telefone_limpo and not nome:
+        # -------------------------------------------------------------
+        # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS (Match Exato)
+        # -------------------------------------------------------------
+        if nome and telefone_limpo:
+            termo_busca = f"%{nome}%"
+            query = """
+                SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+                FROM estabelecimentos_raw 
+                WHERE nome_fantasia ILIKE %s 
+                  AND ((ddd1 || telefone1) = %s OR (ddd2 || telefone2) = %s)
+            """
+            parametros = [termo_busca, telefone_limpo, telefone_limpo]
+
+            if uf and uf.strip():
+                query += " AND uf = %s"
+                parametros.append(uf.strip().upper())
+
+            query += " LIMIT 1"
+            
+            cursor.execute(query, tuple(parametros))
+            resultado = cursor.fetchone()
+            conn.close()
+
+            if resultado:
+                return {
+                    "empresa": resultado["nome_fantasia"],
+                    "telefone": formatar_telefone(resultado["ddd1"], resultado["telefone1"]),
+                    "telefones": [formatar_telefone(resultado["ddd1"], resultado["telefone1"])],
+                    "status": "OFICIAL",
+                    "uf": resultado["uf"],
+                    "mensagem": "Número verificado e seguro!"
+                }
+            else:
+                return {
+                    "empresa": nome,
+                    "telefone": telefone,
+                    "status": "NAO_OFICIAL",
+                    "mensagem": "Número não consta como oficial para esta empresa."
+                }
+
+        # -------------------------------------------------------------
+        # CENÁRIO 2: BUSCA APENAS POR TELEFONE
+        # -------------------------------------------------------------
+        elif telefone_limpo and not nome:
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, email, uf
                 FROM estabelecimentos_raw 
@@ -81,8 +123,10 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-        # 2. BUSCA POR NOME (OTIMIZADO COM GIN TRGM ILIKE)
-        if nome:
+        # -------------------------------------------------------------
+        # CENÁRIO 3: BUSCA APENAS POR NOME (Com paginação)
+        # -------------------------------------------------------------
+        elif nome and not telefone_limpo:
             if len(nome) < 3:
                 conn.close()
                 return {"status": "ERRO", "mensagem": "Digite pelo menos 3 caracteres para buscar por nome."}
@@ -91,9 +135,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             offset = (pagina - 1) * por_pagina
             limite_busca = por_pagina + 1 
             
-            # Aproveitando o poder do GIN pg_trgm, a busca pode ser em qualquer parte da string sem perder performance
             termo_busca = f"%{nome}%"
-
             query_base = "WHERE nome_fantasia ILIKE %s"
             parametros = [termo_busca]
 
@@ -110,35 +152,14 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             """, tuple(parametros + [limite_busca, offset]))
             
             empresas_encontradas = cursor.fetchall()
+            conn.close()
 
             if not empresas_encontradas and pagina == 1:
-                conn.close()
                 return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa encontrada com este nome."}
 
             tem_proxima = len(empresas_encontradas) > por_pagina
             if tem_proxima:
                 empresas_encontradas = empresas_encontradas[:por_pagina]
-
-            if telefone and pagina == 1:
-                empresa = empresas_encontradas[0]
-                telefones_brutos = []
-                if empresa['ddd1'] and empresa['telefone1']:
-                    telefones_brutos.append(empresa['ddd1'] + empresa['telefone1'])
-                if empresa['ddd2'] and empresa['telefone2']:
-                    telefones_brutos.append(empresa['ddd2'] + empresa['telefone2'])
-
-                resposta = {
-                    "empresa": empresa["nome_fantasia"],
-                    "telefones": [formatar_telefone(empresa['ddd1'], empresa['telefone1'])],
-                    "telefone": telefone,
-                    "uf": empresa["uf"]
-                }
-                if telefone_limpo in telefones_brutos:
-                    resposta.update({"status": "OFICIAL", "mensagem": "Número verificado e seguro."})
-                else:
-                    resposta.update({"status": "NAO_OFICIAL", "mensagem": "Número não consta como oficial."})
-                conn.close()
-                return resposta
 
             lista_resultados = []
             for emp in empresas_encontradas:
@@ -147,7 +168,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 if emp['ddd2'] and emp['telefone2']: tels.append(formatar_telefone(emp['ddd2'], emp['telefone2']))
                 lista_resultados.append({"empresa": emp["nome_fantasia"], "telefones": tels, "uf": emp["uf"]})
 
-            conn.close()
             return {
                 "status": "LISTA",
                 "resultados": lista_resultados,
