@@ -242,30 +242,37 @@ def listar_empresas():
     offset = (pagina - 1) * por_pagina
 
     conn = conectar()
+    if not conn:
+        return "Erro ao conectar ao banco de dados", 500
+        
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Garantimos que o 'cnpj' (ou 'cnpj_base') seja selecionado. 
-    # Se der erro de coluna não encontrada, altere 'cnpj' para 'cnpj_base'.
-    cursor.execute("""
-        SELECT cnpj, nome_fantasia, ddd1, telefone1, uf 
-        FROM estabelecimentos_raw 
-        WHERE nome_fantasia IS NOT NULL 
-          AND nome_fantasia != ''
-          AND uf = 'SP'
-        ORDER BY nome_fantasia ASC 
-        LIMIT %s OFFSET %s
-    """, (por_pagina, offset))
-    
-    empresas_raw = cursor.fetchall()
+    try:
+        # Tentamos buscar o CNPJ. Se der erro de coluna, o log do servidor avisará.
+        # Adicionei o filtro de SP conforme conversamos.
+        cursor.execute("""
+            SELECT cnpj, nome_fantasia, ddd1, telefone1, uf 
+            FROM estabelecimentos_raw 
+            WHERE nome_fantasia IS NOT NULL 
+              AND nome_fantasia != ''
+              AND uf = 'SP'
+            ORDER BY nome_fantasia ASC 
+            LIMIT %s OFFSET %s
+        """, (por_pagina, offset))
+        
+        empresas_raw = cursor.fetchall()
 
-    for emp in empresas_raw:
-        emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
+        for emp in empresas_raw:
+            emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
 
-    conn.close()
+        conn.close()
+        return render_template("empresas.html", empresas=empresas_raw, pagina=pagina)
 
-    return render_template("empresas.html", 
-                           empresas=empresas_raw, 
-                           pagina=pagina)
+    except Exception as e:
+        if conn: conn.close()
+        # Isso vai imprimir o erro real no console para você ler
+        print(f"ERRO NO SQL: {e}")
+        return f"Erro interno no banco de dados: {e}", 500
 
 @app.route("/admin/empresa/<cnpj>")
 def visualizar_empresa(cnpj):
@@ -273,18 +280,26 @@ def visualizar_empresa(cnpj):
         return redirect(url_for('login'))
 
     conn = conectar()
+    if not conn:
+        return "Erro ao conectar ao banco de dados", 500
+
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Busca absolutamente todas as colunas da empresa
-    # O cnpj é passado como string para evitar problemas com zeros à esquerda
-    cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj = %s", (str(cnpj),))
-    empresa = cursor.fetchone()
-    conn.close()
+    try:
+        # Buscamos usando %s para o psycopg2 tratar o CNPJ corretamente como string
+        cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj = %s", (str(cnpj),))
+        empresa = cursor.fetchone()
+        conn.close()
 
-    if not empresa:
-        return "Empresa não encontrada", 404
+        if not empresa:
+            return "Empresa não encontrada no banco.", 404
 
-    return render_template("detalhes_empresa.html", empresa=empresa)
+        return render_template("detalhes_empresa.html", empresa=empresa)
+        
+    except Exception as e:
+        if conn: conn.close()
+        print(f"ERRO AO VISUALIZAR: {e}")
+        return f"Erro ao buscar detalhes: {e}", 500
 
 #-----#
 
