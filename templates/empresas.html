@@ -46,6 +46,17 @@
             </div>
         {% endif %}
     </div>
+    <div class="paginacao">
+        {% if pagina > 1 %}
+            <a href="{{ url_for('listar_empresas', pagina=pagina-1) }}" class="btn-pag">⬅️ Anterior</a>
+        {% endif %}
+        
+        <span class="pagina-atual">Página {{ pagina }}</span>
+
+        {% if empresas|length == 100 %}
+            <a href="{{ url_for('listar_empresas', pagina=pagina+1) }}" class="btn-pag">Próxima ➡️</a>
+        {% endif %}
+    </div>
 </div>
 
 <style>
