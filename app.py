@@ -248,7 +248,19 @@ def listar_empresas():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # ALTERADO: cnpj para cnpj_base
+        # 1. PEGAR O TOTAL FILTRADO (Apenas SP e com Nome)
+        # Como supervisor, você sabe que o COUNT demora um pouco, 
+        # mas aqui é necessário para saber o fim da lista.
+        cursor.execute("""
+            SELECT COUNT(*) FROM estabelecimentos_raw 
+            WHERE nome_fantasia IS NOT NULL AND nome_fantasia != '' AND uf = 'SP'
+        """)
+        total_registros = cursor.fetchone()['count']
+        
+        # Cálculo do total de páginas
+        total_paginas = (total_registros + por_pagina - 1) // por_pagina
+
+        # 2. BUSCAR OS DADOS DA PÁGINA
         cursor.execute("""
             SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf 
             FROM estabelecimentos_raw 
@@ -264,7 +276,13 @@ def listar_empresas():
             emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
 
         conn.close()
-        return render_template("empresas.html", empresas=empresas_raw, pagina=pagina)
+        
+        # Passamos 'total_paginas' para o HTML
+        return render_template("empresas.html", 
+                               empresas=empresas_raw, 
+                               pagina=pagina, 
+                               total_paginas=total_paginas,
+                               total_registros=total_registros)
 
     except Exception as e:
         if conn: conn.close()
