@@ -7,6 +7,27 @@
         <p>Abaixo estão as empresas localizadas na base de dados. Os telefones foram formatados automaticamente.</p>
     </div>
 
+    <!-- BLOCO DE FILTRO ADICIONADO -->
+    <div class="filtros" style="margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #eee; display: flex; align-items: center; gap: 15px;">
+        <form method="GET" action="{{ url_for('listar_empresas') }}" style="display: flex; align-items: center; gap: 10px; margin: 0;">
+            <label style="font-weight: bold; color: #2c3e50;">Filtrar por UF:</label>
+            <select name="uf" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; background: white; color: #333; outline: none;">
+                <option value="">Brasil (Todos)</option>
+                <option value="SP" {% if uf_atual == 'SP' %}selected{% endif %}>São Paulo</option>
+                <option value="RJ" {% if uf_atual == 'RJ' %}selected{% endif %}>Rio de Janeiro</option>
+                <option value="MG" {% if uf_atual == 'MG' %}selected{% endif %}>Minas Gerais</option>
+                <option value="PR" {% if uf_atual == 'PR' %}selected{% endif %}>Paraná</option>
+                <option value="SC" {% if uf_atual == 'SC' %}selected{% endif %}>Santa Catarina</option>
+                <option value="RS" {% if uf_atual == 'RS' %}selected{% endif %}>Rio Grande do Sul</option>
+            </select>
+            <button type="submit" class="btn-ver" style="border: none; cursor: pointer; height: 35px;">Aplicar</button>
+            
+            {% if uf_atual %}
+                <a href="{{ url_for('listar_empresas') }}" style="font-size: 0.85rem; color: #e74c3c; text-decoration: none; margin-left: 5px;">✖ Limpar</a>
+            {% endif %}
+        </form>
+    </div>
+
     <div class="tabela-box">
         <table class="tabela-admin">
             <thead>
@@ -20,15 +41,9 @@
             <tbody>
                 {% for e in empresas %}
                 <tr>
-                    <!-- UF em destaque -->
                     <td><span class="badge-id">{{ e.uf }}</span></td>
-                    
-                    <!-- Nome Fantasia vindo do banco -->
                     <td class="empresa-nome">{{ e.nome_fantasia if e.nome_fantasia else 'RAZÃO SOCIAL DISPONÍVEL' }}</td>
-                    
-                    <!-- Telefone já formatado pelo Python -->
                     <td class="telefone-col">{{ e.telefone_formatado }}</td>
-
                     <td class="acoes">
                         <a href="{{ url_for('visualizar_empresa', cnpj_base=e.cnpj_base) }}" class="btn-ver">
                             🔍 Detalhes
@@ -41,30 +56,33 @@
         
         {% if not empresas %}
             <div class="sem-dados">
-                <p>Nenhuma empresa encontrada nos registros atuais.</p>
-                <a href="{{ url_for('index') }}">Voltar para pesquisa</a>
+                <p>Nenhuma empresa encontrada para o filtro selecionado.</p>
+                <a href="{{ url_for('listar_empresas') }}">Ver todas as empresas</a>
             </div>
         {% endif %}
     </div>
+
+    <!-- PAGINAÇÃO AJUSTADA COM uf=uf_atual -->
     <div class="pagination" style="margin-top: 20px; text-align: center;">
         {% if pagina > 1 %}
-            <a href="{{ url_for('listar_empresas', pagina=pagina-1) }}" class="btn">⬅️ Anterior</a>
+            <a href="{{ url_for('listar_empresas', pagina=pagina-1, uf=uf_atual) }}" class="btn-ver" style="text-decoration: none;">⬅️ Anterior</a>
         {% endif %}
     
         <span style="margin: 0 15px;">
             Página <strong>{{ pagina }}</strong> de <strong>{{ total_paginas }}</strong>
             <br>
-            <small>({{ total_registros }} empresas em SP)</small>
+            <small style="color: #7f8c8d;">
+                ({{ total_registros }} empresas {% if uf_atual %}em {{ uf_atual }}{% else %}no total{% endif %})
+            </small>
         </span>
     
         {% if pagina < total_paginas %}
-            <a href="{{ url_for('listar_empresas', pagina=pagina+1) }}" class="btn">Próxima ➡️</a>
+            <a href="{{ url_for('listar_empresas', pagina=pagina+1, uf=uf_atual) }}" class="btn-ver" style="text-decoration: none;">Próxima ➡️</a>
         {% endif %}
     </div>
 </div>
 
 <style>
-    /* Seus estilos originais mantidos com pequenos ajustes */
     .lista-container {
         max-width: 1000px;
         margin: 0 auto;
@@ -140,16 +158,6 @@
         font-weight: bold;
     }
 
-    .status-badge {
-        background: #e8f5e9;
-        color: #2e7d32;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: bold;
-        text-transform: uppercase;
-    }
-
     .acoes {
         text-align: center;
     }
@@ -169,39 +177,20 @@
         padding-bottom: 40px;
     }
 
-    .btn-pag {
+    .btn-ver {
         background-color: #3498db;
         color: white;
-        padding: 10px 20px;
+        padding: 8px 16px;
+        border-radius: 4px;
         text-decoration: none;
-        border-radius: 8px;
-        font-weight: bold;
+        font-size: 0.85rem;
         transition: 0.3s;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: inline-block;
     }
 
-    .btn-pag:hover {
+    .btn-ver:hover { 
         background-color: #2980b9;
-        transform: translateY(-2px);
+        transform: translateY(-1px);
     }
-
-    .pagina-atual {
-        font-weight: bold;
-        color: #2c3e50;
-        font-size: 1.2rem;
-        background: #eee;
-        padding: 5px 15px;
-        border-radius: 20px;
-    }
-    .btn-ver {
-    background-color: #3498db;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 0.85rem;
-}
-.btn-ver:hover { background-color: #2980b9; }
-    
 </style>
 {% endblock %}
