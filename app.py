@@ -288,7 +288,7 @@ def historico():
         return redirect(url_for('login'))
     # Pega o histórico da sessão e manda para o template.
     pesquisas = session.get('pesquisas_recentes', [])
-    return render_template("historico.html", pesquisas=pesquisas)
+    return render_template("em_obras.html", pesquisas=pesquisas)
 
 # =========================
 # ADMIN (PROTEGER!)
