@@ -33,7 +33,6 @@ def limpar_telefone(tel):
 # =========================
 def verificar_empresa(nome=None, telefone=None):
     conn = conectar()
-
     if conn is None:
         return {"status": "ERRO", "mensagem": "Erro ao conectar ao banco"}
 
@@ -41,9 +40,8 @@ def verificar_empresa(nome=None, telefone=None):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         telefone = limpar_telefone(telefone)
 
-        # 1. BUSCA POR TELEFONE (Prioridade)
+        # 1. BUSCA POR TELEFONE
         if telefone and not nome:
-            # Busca usando a lógica do índice que criamos: concatenando DDD + Telefone
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, email, uf
                 FROM estabelecimentos_raw 
@@ -55,8 +53,7 @@ def verificar_empresa(nome=None, telefone=None):
             conn.close()
 
             if resultado:
-                # Se não houver nome_fantasia, usamos o E-mail ou um aviso
-                nome_exibir = resultado["nome_fantasia"] if resultado["nome_fantasia"] else "Empresa (Nome não disponível)"
+                nome_exibir = resultado["nome_fantasia"] if resultado["nome_fantasia"] else "Empresa Registrada"
                 return {
                     "empresa": nome_exibir,
                     "telefone": telefone,
@@ -69,12 +66,11 @@ def verificar_empresa(nome=None, telefone=None):
                     "empresa": None,
                     "telefone": telefone,
                     "status": "NAO_ENCONTRADO",
-                    "mensagem": "Telefone não encontrado na base da Receita Federal."
+                    "mensagem": "Telefone não encontrado na base oficial."
                 }
 
         # 2. BUSCA POR NOME
         if nome:
-            # Busca pelo Nome Fantasia
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
                 FROM estabelecimentos_raw 
@@ -88,10 +84,9 @@ def verificar_empresa(nome=None, telefone=None):
                 return {
                     "empresa": nome,
                     "status": "NAO_CADASTRADA",
-                    "mensagem": "Empresa não encontrada na base atual."
+                    "mensagem": "Empresa não encontrada."
                 }
 
-            # Coletamos os telefones disponíveis (tel1 e tel2)
             telefones = []
             if empresa['ddd1'] and empresa['telefone1']:
                 telefones.append(empresa['ddd1'] + empresa['telefone1'])
@@ -105,41 +100,25 @@ def verificar_empresa(nome=None, telefone=None):
                 "uf": empresa["uf"]
             }
 
-            # Caso: Só Nome
             if nome and not telefone:
-                resposta.update({
-                    "status": "CANAIS",
-                    "mensagem": f"Canais oficiais encontrados para esta empresa ({empresa['uf']})."
-                })
-            
-            # Caso: Nome + Telefone (Verificação)
+                resposta.update({"status": "CANAIS", "mensagem": "Canais oficiais encontrados."})
             elif nome and telefone:
                 if telefone in telefones:
-                    resposta.update({
-                        "status": "OFICIAL",
-                        "mensagem": "Número verificado na base oficial da Receita Federal."
-                    })
+                    resposta.update({"status": "OFICIAL", "mensagem": "Número verificado e seguro."})
                 else:
-                    # Aqui você pode manter sua lógica de denúncia se a tabela 'denuncia' ainda existir
-                    resposta.update({
-                        "status": "NAO_OFICIAL",
-                        "mensagem": "Este número não consta como telefone oficial desta empresa."
-                    })
+                    resposta.update({"status": "NAO_OFICIAL", "mensagem": "Número não consta como oficial."})
             
             conn.close()
             return resposta
 
-        else:
-            conn.close()
-            return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
+        return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
 
     except Exception as e:
-        if conn:
-            conn.close()
+        if conn: conn.close()
         return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS PRINCIPAIS (MANTIDAS)
+# ROTAS PRINCIPAIS
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -154,10 +133,81 @@ def index():
             resultado = verificar_empresa(nome, telefone)
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
-# ... (Restante das rotas de Login, Usuário, Admin permanecem IGUAIS)
-# Nota: As rotas de ADMIN (add-empresa, etc) ainda tentam salvar na tabela antiga 'empresa'. 
-# Como agora você usa a base da Receita, essas rotas de "adicionar manual" precisarão 
-# ser migradas para a tabela 'estabelecimentos_raw' no futuro se você quiser continuar usando.
+@app.route("/usuario", methods=["GET", "POST"])
+def perfil_usuario():
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+    resultado_local = None
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        telefone = request.form.get("telefone", "").strip()
+        if nome or telefone:
+            resultado_local = verificar_empresa(nome, telefone)
+            pesquisas = session.get('pesquisas_recentes', [])
+            pesquisas.insert(0, resultado_local)
+            session['pesquisas_recentes'] = pesquisas[:5]
+            session.modified = True
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("usuario.html", pesquisas=pesquisas, resultado_modal=resultado_local)
+
+# =========================
+# LOGIN / LOGOUT
+# =========================
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if "usuario_logado" in session:
+        return redirect(url_for('perfil_usuario'))
+    erro = None
+    if request.method == "POST":
+        if request.form.get("usuario") == "admin" and request.form.get("senha") == "123":
+            session["usuario_logado"] = "admin"
+            return redirect(url_for('perfil_usuario'))
+        else:
+            erro = "Usuário ou senha incorretos."
+    return render_template("login.html", erro=erro)
+
+@app.route("/logout")
+def logout():
+    session.pop("usuario_logado", None)
+    return redirect(url_for('login'))
+
+# =========================
+# PÁGINAS ESTÁTICAS
+# =========================
+@app.route("/sobre")
+def sobre(): return render_template("sobre.html")
+
+@app.route("/contato")
+def contato(): return render_template("contato.html")
+
+@app.route("/historico")
+def historico():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("em_obras.html", pesquisas=pesquisas)
+
+@app.route("/denuncia")
+def denuncia():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    return render_template("em_obras.html")
+
+# =========================
+# ADMIN (MANTIDAS)
+# =========================
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    mensagem = None
+    if request.method == "POST":
+        # Nota: Esta parte ainda tenta inserir na tabela 'empresa' antiga.
+        # Se desejar usar a nova tabela para cadastros manuais, precisaremos ajustar aqui.
+        mensagem = "Funcionalidade de cadastro manual em manutenção (Base Receita Ativa)."
+    return render_template("admin.html", mensagem=mensagem)
+
+@app.route("/admin/empresas")
+def listar_empresas():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    return render_template("em_obras.html")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
