@@ -19,82 +19,107 @@
 </section>
 
 {% if resultado %}
-<!-- CORREÇÃO: Adicionada a classe 'neutro' para o status CANAIS -->
-<div class="resultado 
-    {% if resultado.status == 'OFICIAL' %}sucesso
-    {% elif resultado.status == 'ALERTA' %}alerta
-    {% elif resultado.status == 'CANAIS' %}neutro
-    {% else %}erro
-    {% endif %}">
-    
-    <div class="icone">
-        <!-- CORREÇÃO: Trocado o ✖ por um ícone de empresa para o status CANAIS -->
-        {% if resultado.status == 'OFICIAL' %}✔
-        {% elif resultado.status == 'ALERTA' %}⚠
-        {% elif resultado.status == 'CANAIS' %}🏢
-        {% else %}✖
-        {% endif %}
+
+    <!-- NOVO BLOCO: TRATAMENTO PARA MÚLTIPLOS RESULTADOS (LISTA) -->
+    {% if resultado.status == 'LISTA' %}
+    <div class="resultado neutro" style="max-width: 800px; margin: 20px auto; text-align: left;">
+        <div class="icone">🏢</div>
+        <div class="info">
+            <h3>Empresas Encontradas</h3>
+            <p>{{ resultado.mensagem }}</p>
+            <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0;">
+            
+            <div style="display: grid; gap: 15px; margin-top: 15px;">
+                {% for item in resultado.resultados %}
+                <div style="padding: 10px; border: 1px solid #eee; border-radius: 8px; background: #f9f9f9;">
+                    <strong style="font-size: 1.1em; color: #2c3e50;">{{ item.empresa }}</strong> 
+                    <span style="font-size: 0.9em; background: #eee; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">{{ item.uf }}</span>
+                    <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 0.95em;">
+                        {% for tel in item.telefones %}
+                            <li>📞 {{ tel }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 
-    <div class="info">
-        <h3>
-            {% if resultado.status == 'OFICIAL' %}Número Oficial
-            {% elif resultado.status == 'ALERTA' %}Número com denúncias
-            {% elif resultado.status == 'CANAIS' %}Canais Oficiais Registrados
-            {% else %}Número não oficial
-            {% endif %}
-        </h3>
+    <!-- BLOCO ORIGINAL: MANTÉM TODA A SUA LÓGICA PARA RESULTADOS ÚNICOS -->
+    {% else %}
+    <div class="resultado 
+        {% if resultado.status == 'OFICIAL' %}sucesso
+        {% elif resultado.status == 'ALERTA' %}alerta
+        {% elif resultado.status == 'CANAIS' %}neutro
+        {% else %}erro
+        {% endif %}">
         
-        <p><strong>Status:</strong> {{ resultado.status }}</p>
-        {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
-        <p>{{ resultado.mensagem }}</p>
-
-        <div class="colunas">
-            <!-- LISTA DE TELEFONES (Plural - para quando busca por nome) -->
-            {% if resultado.telefones %}
-            <div class="coluna">
-                <strong>📞 Telefones Oficiais</strong>
-                <ul>
-                    {% for tel in resultado.telefones %}
-                        <li>{{ tel }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
+        <div class="icone">
+            {% if resultado.status == 'OFICIAL' %}✔
+            {% elif resultado.status == 'ALERTA' %}⚠
+            {% elif resultado.status == 'CANAIS' %}🏢
+            {% else %}✖
             {% endif %}
+        </div>
 
-            <!-- Se for uma pesquisa de um telefone específico que NÃO é oficial, mostra ele aqui -->
-            {% if resultado.status != 'CANAIS' and resultado.telefone %}
-            <div class="coluna">
-                <strong>📞 Contato Pesquisado</strong>
-                <ul>
-                    <li>{{ resultado.telefone }}</li>
-                </ul>
+        <div class="info">
+            <h3>
+                {% if resultado.status == 'OFICIAL' %}Número Oficial
+                {% elif resultado.status == 'ALERTA' %}Número com denúncias
+                {% elif resultado.status == 'CANAIS' %}Canais Oficiais Registrados
+                {% else %}Número não oficial
+                {% endif %}
+            </h3>
+            
+            <p><strong>Status:</strong> {{ resultado.status }}</p>
+            {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
+            <p>{{ resultado.mensagem }}</p>
+
+            <div class="colunas">
+                {% if resultado.telefones %}
+                <div class="coluna">
+                    <strong>📞 Telefones Oficiais</strong>
+                    <ul>
+                        {% for tel in resultado.telefones %}
+                            <li>{{ tel }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if resultado.status != 'CANAIS' and resultado.telefone %}
+                <div class="coluna">
+                    <strong>📞 Contato Pesquisado</strong>
+                    <ul>
+                        <li>{{ resultado.telefone }}</li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if resultado.emails %}
+                <div class="coluna">
+                    <strong>📧 Emails Relacionados</strong>
+                    <ul>
+                        {% for email in resultado.emails %}<li>{{ email }}</li>{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
 
-            {% if resultado.emails %}
-            <div class="coluna">
-                <strong>📧 Emails Relacionados</strong>
+            {% if resultado.denuncias %}
+            <div style="margin-top: 15px;">
+                <strong>🚨 Denúncias Recentes</strong>
                 <ul>
-                    {% for email in resultado.emails %}<li>{{ email }}</li>{% endfor %}
+                    {% for d in resultado.denuncias %}<li>{{ d.tipo }} - {{ d.descricao }}</li>{% endfor %}
                 </ul>
             </div>
             {% endif %}
         </div>
-
-        {% if resultado.denuncias %}
-        <div style="margin-top: 15px;">
-            <strong>🚨 Denúncias Recentes</strong>
-            <ul>
-                {% for d in resultado.denuncias %}<li>{{ d.tipo }} - {{ d.descricao }}</li>{% endfor %}
-            </ul>
-        </div>
-        {% endif %}
     </div>
-</div>
+    {% endif %}
+
 {% endif %}
 
-<!-- CSS Rápido para garantir que o 'neutro' seja branco/cinza claro -->
 <style>
     .resultado.neutro {
         background-color: #ffffff;
@@ -102,7 +127,9 @@
         color: #333;
     }
     .resultado.neutro .icone {
-        color: #2c3e50; /* Cor escura para o ícone da empresa */
+        color: #2c3e50;
     }
+    /* Estilo para a lista de múltiplas empresas */
+    .resultado .info hr { opacity: 0.3; }
 </style>
 {% endblock %}
