@@ -254,7 +254,6 @@ def listar_empresas():
             FROM estabelecimentos_raw 
             WHERE nome_fantasia IS NOT NULL 
               AND nome_fantasia != ''
-              AND uf = 'SP'
             ORDER BY nome_fantasia ASC 
             LIMIT %s OFFSET %s
         """, (por_pagina, offset))
