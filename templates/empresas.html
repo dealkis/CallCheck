@@ -155,5 +155,39 @@
         text-align: center;
         color: #999;
     }
+
+    .paginacao {
+        margin-top: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        padding-bottom: 40px;
+    }
+
+    .btn-pag {
+        background-color: #3498db;
+        color: white;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: 0.3s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-pag:hover {
+        background-color: #2980b9;
+        transform: translateY(-2px);
+    }
+
+    .pagina-atual {
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 1.2rem;
+        background: #eee;
+        padding: 5px 15px;
+        border-radius: 20px;
+    }
 </style>
 {% endblock %}
