@@ -4,28 +4,26 @@
 <section class="hero">
     <h1>Verifique o número de telefone da empresa</h1>
     
-    <!-- MENSAGEM DE ERRO CASO ENVIE VAZIO -->
     {% if erro_formulario %}
         <p style="color: #ff4d4d; background: #ffe6e6; padding: 10px; border-radius: 5px; display: inline-block; font-weight: bold;">
             {{ erro_formulario }}
         </p>
     {% endif %}
 
-    <form method="POST" class="form-box">
-        <input type="text" name="nome" placeholder="🏢 Nome da empresa">
-        <input type="text" name="telefone" placeholder="📞 Telefone">
+    <form method="POST" action="/" class="form-box">
+        <input type="text" name="nome" placeholder="🏢 Nome da empresa" value="{{ request.form.get('nome') or request.args.get('nome', '') }}">
+        <input type="text" name="telefone" placeholder="📞 Telefone" value="{{ request.form.get('telefone') or request.args.get('telefone', '') }}">
         <button type="submit">Verificar</button>
     </form>
 </section>
 
 {% if resultado %}
 
-    <!-- NOVO BLOCO: TRATAMENTO PARA MÚLTIPLOS RESULTADOS (LISTA) -->
     {% if resultado.status == 'LISTA' %}
     <div class="resultado neutro" style="max-width: 800px; margin: 20px auto; text-align: left;">
         <div class="icone">🏢</div>
         <div class="info">
-            <h3>Empresas Encontradas</h3>
+            <h3>Empresas Encontradas ({{ resultado.total_resultados }})</h3>
             <p>{{ resultado.mensagem }}</p>
             <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0;">
             
@@ -42,11 +40,24 @@
                 </div>
                 {% endfor %}
             </div>
+
+            <!-- CONTROLES DE PAGINAÇÃO -->
+            <div style="margin-top: 25px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if resultado.pagina_atual > 1 %}
+                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual - 1) }}" style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none;">⬅ Anterior</a>
+                {% endif %}
+
+                <span style="font-weight: bold;">Página {{ resultado.pagina_atual }} de {{ resultado.total_paginas }}</span>
+
+                {% if resultado.pagina_atual < resultado.total_paginas %}
+                    <a href="{{ url_for('index', nome=resultado.nome_buscado, pagina=resultado.pagina_atual + 1) }}" style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none;">Próxima ➡</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- BLOCO ORIGINAL: MANTÉM TODA A SUA LÓGICA PARA RESULTADOS ÚNICOS -->
     {% else %}
+    <!-- RESULTADO ÚNICO (ORIGINAL) -->
     <div class="resultado 
         {% if resultado.status == 'OFICIAL' %}sucesso
         {% elif resultado.status == 'ALERTA' %}alerta
@@ -70,50 +81,23 @@
                 {% else %}Número não oficial
                 {% endif %}
             </h3>
-            
             <p><strong>Status:</strong> {{ resultado.status }}</p>
             {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
             <p>{{ resultado.mensagem }}</p>
-
             <div class="colunas">
                 {% if resultado.telefones %}
                 <div class="coluna">
                     <strong>📞 Telefones Oficiais</strong>
-                    <ul>
-                        {% for tel in resultado.telefones %}
-                            <li>{{ tel }}</li>
-                        {% endfor %}
-                    </ul>
+                    <ul>{% for tel in resultado.telefones %}<li>{{ tel }}</li>{% endfor %}</ul>
                 </div>
                 {% endif %}
-
                 {% if resultado.status != 'CANAIS' and resultado.telefone %}
                 <div class="coluna">
                     <strong>📞 Contato Pesquisado</strong>
-                    <ul>
-                        <li>{{ resultado.telefone }}</li>
-                    </ul>
-                </div>
-                {% endif %}
-
-                {% if resultado.emails %}
-                <div class="coluna">
-                    <strong>📧 Emails Relacionados</strong>
-                    <ul>
-                        {% for email in resultado.emails %}<li>{{ email }}</li>{% endfor %}
-                    </ul>
+                    <ul><li>{{ resultado.telefone }}</li></ul>
                 </div>
                 {% endif %}
             </div>
-
-            {% if resultado.denuncias %}
-            <div style="margin-top: 15px;">
-                <strong>🚨 Denúncias Recentes</strong>
-                <ul>
-                    {% for d in resultado.denuncias %}<li>{{ d.tipo }} - {{ d.descricao }}</li>{% endfor %}
-                </ul>
-            </div>
-            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -121,15 +105,7 @@
 {% endif %}
 
 <style>
-    .resultado.neutro {
-        background-color: #ffffff;
-        border: 1px solid #ddd;
-        color: #333;
-    }
-    .resultado.neutro .icone {
-        color: #2c3e50;
-    }
-    /* Estilo para a lista de múltiplas empresas */
-    .resultado .info hr { opacity: 0.3; }
+    .resultado.neutro { background-color: #ffffff; border: 1px solid #ddd; color: #333; }
+    .resultado.neutro .icone { color: #2c3e50; }
 </style>
 {% endblock %}
