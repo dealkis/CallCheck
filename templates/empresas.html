@@ -1,19 +1,147 @@
-<h2>Empresas cadastradas</h2>
+{% extends "base.html" %}
 
-<table border="1">
-<tr>
-    <th>ID</th>
-    <th>Nome</th>
-    <th>Ações</th>
-</tr>
+{% block content %}
+<div class="lista-container">
+    <div class="header-lista">
+        <h2>📋 Empresas Cadastradas</h2>
+        <p>Abaixo estão todas as empresas registradas no CallCheck. Você pode gerenciar telefones ou excluir registros.</p>
+    </div>
 
-{% for e in empresas %}
-<tr>
-    <td>{{ e[0] }}</td>
-    <td>{{ e[1] }}</td>
-    <td>
-        <a href="/admin/empresa/{{ e[0] }}">Gerenciar</a>
-    </td>
-</tr>
-{% endfor %}
-</table>
+    <div class="tabela-box">
+        <table class="tabela-admin">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome da Empresa</th>
+                    <th style="text-align: center;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in empresas %}
+                <tr>
+                    <td><span class="badge-id">#{{ e[0] }}</span></td>
+                    <td class="empresa-nome">{{ e[1] }}</td>
+                    <td class="acoes">
+                        <a href="{{ url_for('gerenciar_empresa', id=e[0]) }}" class="btn-gerenciar">
+                            ⚙️ Gerenciar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not empresas %}
+            <div class="sem-dados">
+                <p>Nenhuma empresa cadastrada no momento.</p>
+                <a href="{{ url_for('admin') }}">Cadastrar a primeira</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .lista-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .header-lista {
+        margin-bottom: 25px;
+    }
+
+    .header-lista h2 {
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .header-lista p {
+        color: #7f8c8d;
+        margin: 0;
+    }
+
+    /* Caixa que envolve a tabela */
+    .tabela-box {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        overflow: hidden; /* Garante que as bordas da tabela sigam o arredondamento */
+    }
+
+    /* Estilização da Tabela */
+    .tabela-admin {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .tabela-admin thead {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #eee;
+    }
+
+    .tabela-admin th {
+        padding: 15px 20px;
+        color: #333;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+    }
+
+    .tabela-admin td {
+        padding: 15px 20px;
+        border-bottom: 1px solid #eee;
+        color: #444;
+    }
+
+    /* Efeito de hover na linha */
+    .tabela-admin tbody tr:hover {
+        background-color: #fcfcfc;
+    }
+
+    .badge-id {
+        background: #eee;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        color: #666;
+    }
+
+    .empresa-nome {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    /* Botões de Ação */
+    .acoes {
+        text-align: center;
+    }
+
+    .btn-gerenciar {
+        display: inline-block;
+        padding: 8px 16px;
+        background-color: #3498db;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        transition: background 0.3s;
+    }
+
+    .btn-gerenciar:hover {
+        background-color: #2980b9;
+    }
+
+    .sem-dados {
+        padding: 40px;
+        text-align: center;
+        color: #999;
+    }
+
+    .sem-dados a {
+        color: #3498db;
+        text-decoration: none;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
