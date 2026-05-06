@@ -5,63 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CallCheck - Verificador</title>
     <style>
-        /* Ajuste no body para garantir que o rodapé vá para o fim da página */
-        body { margin: 0; font-family: Arial; background: #f4f6f9; display: flex; flex-direction: column; min-height: 100vh; }
-        
-        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: white; border-bottom: 1px solid #ddd; }
-        .logo { font-weight: bold; font-size: 20px; }
-        nav a { margin: 0 15px; text-decoration: none; color: black; }
-        .login-btn { padding: 8px 15px; background: #000; color: #fff; border: none; cursor: pointer; border-radius: 5px; text-decoration: none; }
-        
-        /* =========================================
-           NOVAS CLASSES PARA LAYOUT E BARRA LATERAL
-           ========================================= */
-        .wrapper { display: flex; flex: 1; } /* Flex para alinhar sidebar e conteúdo lado a lado */
-        
-        .sidebar {
-            width: 230px;
-            background: #2c3e50; /* Azul escuro elegante */
-            padding: 20px 10px;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        /* Acessibilidade: Fontes Maiores e Alto Contraste */
+        body { 
+            margin: 0; 
+            font-family: Arial, sans-serif; 
+            background: #f4f6f9; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            font-size: 18px; /* Melhoria de Acessibilidade */
+            color: #111; /* Contraste Alto */
         }
         
-        .sidebar a {
-            display: block;
-            color: #ecf0f1;
-            padding: 12px 15px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-bottom: 8px;
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: white; border-bottom: 2px solid #ddd; }
+        .logo { font-weight: bold; font-size: 24px; color: #000; }
+        nav a { margin: 0 15px; text-decoration: none; color: #222; font-weight: bold; font-size: 18px; transition: color 0.3s; }
+        nav a:hover { color: #0056b3; }
+        
+        .login-btn, button, input[type="submit"] { 
+            padding: 12px 24px; /* Botões maiores */
+            background: #000; 
+            color: #fff; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-size: 18px; /* Acessibilidade */
+            font-weight: bold;
             transition: background 0.3s;
         }
+        button:hover, .login-btn:hover { background: #333; }
         
-        .sidebar a:hover {
-            background: #34495e; /* Destaque ao passar o mouse */
-        }
+        input { font-size: 18px; padding: 12px; } /* Inputs maiores */
         
-        .content-area {
-            flex: 1; /* Ocupa todo o resto do espaço lateral */
-            padding: 30px;
-            box-sizing: border-box;
-        }
-        /* ========================================= */
-
-        /* Estilos originais mantidos */
-        .hero { text-align: center; padding: 40px; }
-        .form-box input { padding: 10px; margin: 10px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
-        .form-box button { padding: 10px 20px; cursor: pointer; background: #000; color: #fff; border: none; border-radius: 4px; }
-        .resultado { display: flex; align-items: flex-start; gap: 20px; background: white; margin: 30px auto; padding: 20px; width: 50%; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .icone { font-size: 40px; }
+        .wrapper { display: flex; flex: 1; }
+        
+        .sidebar { width: 250px; background: #2c3e50; padding: 20px 10px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+        .sidebar a { display: block; color: #ecf0f1; padding: 15px; text-decoration: none; border-radius: 5px; margin-bottom: 10px; font-weight: bold; font-size: 18px; transition: background 0.3s; }
+        .sidebar a:hover { background: #34495e; }
+        
+        .content-area { flex: 1; padding: 40px; box-sizing: border-box; }
+        
+        .hero { text-align: center; padding: 50px 20px; }
+        .hero h1 { font-size: 2.2em; color: #111; margin-bottom: 20px; }
+        .form-box input { margin: 10px; border: 2px solid #ccc; border-radius: 8px; }
+        
+        .resultado { display: flex; align-items: flex-start; gap: 20px; background: white; margin: 30px auto; padding: 30px; width: 60%; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); font-size: 1.1em; }
+        .icone { font-size: 50px; }
         .info { flex: 1; }
-        .colunas { display: flex; gap: 40px; margin-top: 15px; }
+        .colunas { display: flex; gap: 40px; margin-top: 20px; }
         .coluna { flex: 1; }
-        .sucesso { border-left: 5px solid green; }
-        .erro { border-left: 5px solid red; }
-        .alerta { border-left: 5px solid orange; }
-        ul { padding-left: 20px; }
         
-        /* Ajuste nas features para colar no fundo */
-        .features { display: flex; justify-content: center; gap: 50px; padding: 30px 0; margin-top: auto; border-top: 1px solid #ddd; background: white;}
+        /* SISTEMA DE SEMÁFORO - ACESSIBILIDADE */
+        .sucesso { border-left: 10px solid #28a745; background-color: #f0fdf4; color: #155724; } /* 🟢 Verde */
+        .alerta { border-left: 10px solid #ffc107; background-color: #fffbeb; color: #856404; } /* 🟡 Amarelo */
+        .risco { border-left: 10px solid #dc3545; background-color: #fef2f2; color: #721c24; } /* 🔴 Vermelho */
+        .erro { border-left: 10px solid #dc3545; background-color: #fef2f2; color: #721c24; }
+        
+        ul { padding-left: 25px; line-height: 1.6; }
+        
+        .features { display: flex; justify-content: center; gap: 50px; padding: 40px 0; margin-top: auto; border-top: 2px solid #ddd; background: white; font-size: 1.1em; font-weight: bold; color: #333;}
     </style>
 </head>
 <body>
@@ -74,23 +77,19 @@
         <a href="{{ url_for('contato') }}">Contato</a>
     </nav>
 
-    <!-- MENU DINÂMICO COM NOME DO USUÁRIO -->
     {% if session.get('usuario_logado') %}
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <a href="{{ url_for('perfil_usuario') }}" style="text-decoration: none; color: #007bff; font-weight: bold;">
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <a href="{{ url_for('perfil_usuario') }}" style="text-decoration: none; color: #0056b3; font-weight: bold;">
                 Olá, {{ session['usuario_logado'] }}
             </a>
-            <a href="{{ url_for('logout') }}" class="login-btn" style="background: #d9534f;">Sair</a>
+            <a href="{{ url_for('logout') }}" class="login-btn" style="background: #dc3545;">Sair</a>
         </div>
     {% else %}
         <a href="{{ url_for('login') }}" class="login-btn">Login</a>
     {% endif %}
 </header>
 
-<!-- CONTEINER PRINCIPAL (DIVIDE A TELA EM DUAS PARTES) -->
 <div class="wrapper">
-    
-    <!-- BARRA LATERAL (Aparece apenas na página de usuário ou páginas de admin) -->
     {% if request.endpoint in ['perfil_usuario', 'admin', 'listar_empresas', 'historico', 'gerenciar_empresa', 'editar_empresa', 'denuncia'] %}
     <aside class="sidebar">
         <a href="{{ url_for('perfil_usuario') }}">🏠 Meu Perfil</a>
@@ -98,16 +97,14 @@
         <a href="{{ url_for('listar_empresas') }}">📋 Lista de Empresas</a>
         <a href="{{ url_for('historico') }}">🛠️ Histórico</a>
         <a href="{{ url_for('denuncia') }}">🛠️ Denuncia</a>
-        <a href="{{ url_for('database_view') }}"> 📑DataBase</a>
+        <a href="{{ url_for('database_view') }}"> 📑 DataBase</a>
     </aside>
     {% endif %}
 
-    <!-- ÁREA DE CONTEÚDO (Onde o bloco das outras páginas será renderizado) -->
     <main class="content-area">
         {% block content %}
         {% endblock %}
     </main>
-    
 </div>
 
 <section class="features">
