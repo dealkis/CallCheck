@@ -41,7 +41,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO (BUSCA POR PALAVRA EXATA COM REGEX)
+# VERIFICAÇÃO (PAGINAÇÃO INTELIGENTE ULTRARRÁPIDA)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1):
     conn = conectar()
@@ -81,37 +81,38 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-        # 2. BUSCA POR NOME (USANDO REGEX \y PARA PALAVRA EXATA)
+        # 2. BUSCA POR NOME (PAGINAÇÃO INTELIGENTE SEM COUNT)
         if nome:
             por_pagina = 10
             offset = (pagina - 1) * por_pagina
+            # Buscamos 1 a mais para saber se existe uma próxima página
+            limite_busca = por_pagina + 1 
             
-            # Ajuste da busca: ~* é o operador de Regex Case-Insensitive do Postgres
-            # \\y garante que 'BAR' não vire 'BARRETOS'
             regex_busca = f'\\y{nome}\\y'
 
-            # Contagem total com Regex
-            cursor.execute("SELECT COUNT(*) FROM estabelecimentos_raw WHERE nome_fantasia ~* %s", (regex_busca,))
-            total_resultados = cursor.fetchone()['count']
-
-            if total_resultados == 0:
-                conn.close()
-                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa com esse nome exato."}
-
-            # Busca com Regex + Paginação
+            # Busca com Regex + Paginação Inteligente
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
                 FROM estabelecimentos_raw 
                 WHERE nome_fantasia ~* %s 
                 ORDER BY nome_fantasia ASC 
                 LIMIT %s OFFSET %s
-            """, (regex_busca, por_pagina, offset))
+            """, (regex_busca, limite_busca, offset))
             
             empresas_encontradas = cursor.fetchall()
-            total_paginas = (total_resultados + por_pagina - 1) // por_pagina
 
-            # Validação oficial caso tenha telefone
-            if telefone:
+            if not empresas_encontradas and pagina == 1:
+                conn.close()
+                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa com esse nome exato."}
+
+            # Lógica para saber se tem próxima página
+            tem_proxima = len(empresas_encontradas) > por_pagina
+            if tem_proxima:
+                # Remove o 11º elemento, pois só queremos exibir 10
+                empresas_encontradas = empresas_encontradas[:por_pagina]
+
+            # Validação oficial caso tenha telefone junto
+            if telefone and pagina == 1:
                 empresa = empresas_encontradas[0]
                 telefones_brutos = []
                 if empresa['ddd1'] and empresa['telefone1']:
@@ -132,6 +133,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                 conn.close()
                 return resposta
 
+            # Retorno da Lista formatada
             lista_resultados = []
             for emp in empresas_encontradas:
                 tels = []
@@ -143,11 +145,10 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
             return {
                 "status": "LISTA",
                 "resultados": lista_resultados,
-                "total_resultados": total_resultados,
                 "pagina_atual": pagina,
-                "total_paginas": total_paginas,
+                "tem_proxima": tem_proxima,
                 "nome_buscado": nome,
-                "mensagem": f"Encontradas {total_resultados} empresas contendo a palavra '{nome}'."
+                "mensagem": f"Exibindo resultados para a palavra '{nome}'."
             }
 
         return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
@@ -157,7 +158,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
         return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS PRINCIPAIS (MANTIDAS)
+# ROTAS PRINCIPAIS
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -172,6 +173,7 @@ def index():
             if request.method == "POST": erro_formulario = "Informe nome ou telefone"
         else:
             resultado = verificar_empresa(nome, telefone, pagina)
+            
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
 @app.route("/usuario", methods=["GET", "POST"])
@@ -227,6 +229,13 @@ def denuncia():
 # =========================
 # ADMIN
 # =========================
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    mensagem = None
+    if request.method == "POST": mensagem = "Funcionalidade em manutenção."
+    return render_template("admin.html", mensagem=mensagem)
+
 @app.route("/admin/empresas")
 def listar_empresas():
     if "usuario_logado" not in session: return redirect(url_for('login'))
@@ -267,6 +276,7 @@ def visualizar_empresa(cnpj_base):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 """
   _____   ______          _        _  __ _____  _____ 
