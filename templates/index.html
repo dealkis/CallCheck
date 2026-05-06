@@ -2,45 +2,45 @@
 
 {% block content %}
 <section class="hero">
-    <h1>Verifique o número de telefone da empresa</h1>
+    <h1>Verifique a procedência do telefone</h1>
     
     {% if erro_formulario %}
-        <p style="color: #ff4d4d; background: #ffe6e6; padding: 10px; border-radius: 5px; display: inline-block; font-weight: bold;">
+        <p style="color: #d93025; background: #fce8e6; padding: 15px; border-radius: 8px; display: inline-block; font-weight: bold; border: 1px solid #fad2cf; font-size: 1.1em;">
             {{ erro_formulario }}
         </p>
     {% endif %}
 
-    <form method="POST" action="/" class="form-box" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
-        <input type="text" name="nome" placeholder="🏢 Nome da empresa" value="{{ request.form.get('nome') or request.args.get('nome', '') }}" style="flex: 2; min-width: 200px;">
+    <form method="POST" action="/" class="form-box" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px;">
+        <input type="text" name="nome" placeholder="🏢 Nome da empresa" value="{{ request.form.get('nome') or request.args.get('nome', '') }}" style="flex: 2; min-width: 250px;">
         
-        <input type="text" name="uf" placeholder="📍 UF" maxlength="2" value="{{ request.form.get('uf') or request.args.get('uf', '') or (resultado.uf_buscada if resultado else '') }}" style="width: 60px; text-align: center; text-transform: uppercase;">
+        <input type="text" name="uf" placeholder="📍 UF" maxlength="2" value="{{ request.form.get('uf') or request.args.get('uf', '') or (resultado.uf_buscada if resultado else '') }}" style="width: 80px; text-align: center; text-transform: uppercase;">
         
-        <input type="text" name="telefone" placeholder="📞 Telefone" value="{{ request.form.get('telefone') or request.args.get('telefone', '') }}" style="flex: 1; min-width: 150px;">
+        <input type="text" name="telefone" placeholder="📞 Telefone" value="{{ request.form.get('telefone') or request.args.get('telefone', '') }}" style="flex: 1; min-width: 200px;">
         
-        <button type="submit" style="min-width: 120px;">Verificar</button>
+        <button type="submit" style="min-width: 150px;">Verificar</button>
     </form>
 </section>
 
 {% if resultado %}
 
     {% if resultado.status == 'ERRO' %}
-        <div class="resultado erro" style="max-width: 800px; margin: 20px auto;">
+        <div class="resultado erro" style="max-width: 800px; margin: 30px auto;">
             <p><strong>Erro:</strong> {{ resultado.mensagem }}</p>
         </div>
     {% elif resultado.status == 'LISTA' %}
-    <div class="resultado neutro" style="max-width: 800px; margin: 20px auto; text-align: left;">
+    <div class="resultado neutro" style="max-width: 800px; margin: 30px auto; text-align: left; background-color: #ffffff; border: 2px solid #ddd; border-radius: 12px;">
         <div class="icone">🏢</div>
         <div class="info">
             <h3>Empresas Encontradas</h3>
-            <p>{{ resultado.mensagem }}</p>
-            <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0;">
+            <p style="font-size: 1.1em;">{{ resultado.mensagem }}</p>
+            <hr style="border: 0; border-top: 2px solid #eee; margin: 15px 0;">
             
-            <div style="display: grid; gap: 15px; margin-top: 15px;">
+            <div style="display: grid; gap: 15px; margin-top: 20px;">
                 {% for item in resultado.resultados %}
-                <div style="padding: 10px; border: 1px solid #eee; border-radius: 8px; background: #f9f9f9;">
-                    <strong style="font-size: 1.1em; color: #2c3e50;">{{ item.empresa }}</strong> 
-                    <span style="font-size: 0.8em; background: #2c3e50; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">{{ item.uf }}</span>
-                    <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 0.95em;">
+                <div style="padding: 15px; border: 2px solid #eee; border-radius: 10px; background: #fdfdfd;">
+                    <strong style="font-size: 1.2em; color: #2c3e50;">{{ item.empresa }}</strong> 
+                    <span style="font-size: 0.9em; background: #2c3e50; color: white; padding: 4px 8px; border-radius: 6px; margin-left: 10px; font-weight: bold;">{{ item.uf }}</span>
+                    <ul style="margin: 10px 0 0 0; padding-left: 25px; font-size: 1.05em; font-weight: bold; color: #444;">
                         {% for tel in item.telefones %}
                             <li>📞 {{ tel }}</li>
                         {% endfor %}
@@ -49,22 +49,21 @@
                 {% endfor %}
             </div>
 
-            <!-- CONTROLES DE PAGINAÇÃO OTIMIZADA -->
-            <div style="margin-top: 25px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <div style="margin-top: 30px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 15px;">
                 {% if resultado.pagina_atual > 1 %}
                     <a href="{{ url_for('index', nome=resultado.nome_buscado, uf=resultado.uf_buscada, pagina=resultado.pagina_atual - 1) }}" 
-                       style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                       style="padding: 10px 20px; background: #2c3e50; color: white; border-radius: 8px; text-decoration: none; font-weight: bold;">
                        ⬅ Anterior
                     </a>
                 {% endif %}
 
-                <span style="font-weight: bold; background: #eee; padding: 8px 15px; border-radius: 5px;">
+                <span style="font-weight: bold; background: #eee; padding: 10px 20px; border-radius: 8px; font-size: 1.1em;">
                     Página {{ resultado.pagina_atual }}
                 </span>
 
                 {% if resultado.tem_proxima %}
                     <a href="{{ url_for('index', nome=resultado.nome_buscado, uf=resultado.uf_buscada, pagina=resultado.pagina_atual + 1) }}" 
-                       style="padding: 8px 15px; background: #2c3e50; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                       style="padding: 10px 20px; background: #2c3e50; color: white; border-radius: 8px; text-decoration: none; font-weight: bold;">
                        Próxima ➡
                     </a>
                 {% endif %}
@@ -73,36 +72,38 @@
     </div>
 
     {% else %}
-    <!-- RESULTADO ÚNICO -->
     <div class="resultado 
-        {% if resultado.status == 'OFICIAL' %}sucesso
-        {% elif resultado.status == 'ALERTA' %}alerta
-        {% elif resultado.status == 'ENCONTRADO' %}sucesso
+        {% if resultado.status in ['OFICIAL', 'ENCONTRADO'] %}sucesso
+        {% elif resultado.status in ['ALERTA', 'NAO_OFICIAL', 'NAO_ENCONTRADO'] %}alerta
+        {% elif resultado.status == 'RISCO' %}risco
         {% else %}erro
         {% endif %}">
         
         <div class="icone">
-            {% if resultado.status == 'OFICIAL' or resultado.status == 'ENCONTRADO' %}✔
-            {% elif resultado.status == 'ALERTA' %}⚠
+            {% if resultado.status in ['OFICIAL', 'ENCONTRADO'] %}🟢 ✔
+            {% elif resultado.status in ['ALERTA', 'NAO_OFICIAL', 'NAO_ENCONTRADO'] %}🟡 ⚠
+            {% elif resultado.status == 'RISCO' %}🔴 ⛔
             {% else %}✖
             {% endif %}
         </div>
 
-        <div class="info">
-            <h3>
-                {% if resultado.status == 'OFICIAL' or resultado.status == 'ENCONTRADO' %}Registro Localizado
-                {% elif resultado.status == 'ALERTA' %}Atenção
+        <div class="info" style="width: 100%;">
+            <h3 style="font-size: 1.4em;">
+                {% if resultado.status in ['OFICIAL', 'ENCONTRADO'] %}Registro Localizado
+                {% elif resultado.status in ['ALERTA', 'NAO_OFICIAL', 'NAO_ENCONTRADO'] %}Atenção
+                {% elif resultado.status == 'RISCO' %}Alerta de Segurança
                 {% else %}Não localizado
                 {% endif %}
             </h3>
-            <p><strong>Status:</strong> {{ resultado.status }}</p>
+            <p><strong>Status:</strong> <span style="font-weight: bold;">{{ resultado.status }}</span></p>
             {% if resultado.empresa %}<p><strong>Empresa:</strong> {{ resultado.empresa }}</p>{% endif %}
-            <p>{{ resultado.mensagem }}</p>
+            <p style="font-size: 1.1em;">{{ resultado.mensagem }}</p>
+            
             <div class="colunas">
                 {% if resultado.telefones or resultado.telefone %}
                 <div class="coluna">
                     <strong>📞 Dados do Registro</strong>
-                    <ul>
+                    <ul style="font-weight: bold; font-size: 1.1em;">
                         {% if resultado.telefones %}
                             {% for tel in resultado.telefones %}<li>{{ tel }}</li>{% endfor %}
                         {% elif resultado.telefone %}
@@ -112,14 +113,23 @@
                 </div>
                 {% endif %}
             </div>
+
+            {% if resultado.status in ['NAO_OFICIAL', 'NAO_ENCONTRADO', 'ALERTA'] and resultado.telefone %}
+            <div style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.7); border: 2px solid #ffeeba; border-radius: 10px;">
+                <h4 style="margin-top: 0; color: #856404; font-size: 1.2em;">Recebeu contato suspeito deste número?</h4>
+                <form method="POST" action="{{ url_for('enviar_denuncia') }}" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                    <input type="hidden" name="telefone" value="{{ resultado.telefone }}">
+                    <input type="text" name="motivo" placeholder="Motivo (ex: Fraude, SPAM, Golpe)" style="flex: 1; padding: 12px; font-size: 18px; border: 2px solid #ccc; border-radius: 8px;" required>
+                    <button type="submit" style="background: #dc3545; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 18px; transition: 0.3s;">
+                        🚨 Denunciar Número
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
         </div>
     </div>
     {% endif %}
 
 {% endif %}
-
-<style>
-    .resultado.neutro { background-color: #ffffff; border: 1px solid #ddd; color: #333; }
-    .resultado.erro { background-color: #ffe6e6; border: 1px solid #ff4d4d; color: #333; padding: 20px; border-radius: 8px; text-align: center; }
-</style>
 {% endblock %}
