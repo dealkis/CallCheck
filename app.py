@@ -41,9 +41,9 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO (PAGINAÇÃO INTELIGENTE ULTRARRÁPIDA)
+# VERIFICAÇÃO (OTIMIZADA COM UF E TRAVA DE CARACTERES)
 # =========================
-def verificar_empresa(nome=None, telefone=None, pagina=1):
+def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     conn = conectar()
     if conn is None:
         return {"status": "ERRO", "mensagem": "Erro ao conectar ao banco"}
@@ -81,37 +81,45 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-        # 2. BUSCA POR NOME (PAGINAÇÃO INTELIGENTE SEM COUNT)
+        # 2. BUSCA POR NOME (PAGINAÇÃO INTELIGENTE + FILTRO UF)
         if nome:
+            # Trava de Segurança: Evita sobrecarga com nomes curtos
+            if len(nome) < 3:
+                conn.close()
+                return {"status": "ERRO", "mensagem": "Digite pelo menos 3 caracteres para buscar por nome."}
+
             por_pagina = 10
             offset = (pagina - 1) * por_pagina
-            # Buscamos 1 a mais para saber se existe uma próxima página
             limite_busca = por_pagina + 1 
-            
             regex_busca = f'\\y{nome}\\y'
 
-            # Busca com Regex + Paginação Inteligente
-            cursor.execute("""
+            # Construção Dinâmica da Query
+            query_base = "WHERE nome_fantasia ~* %s"
+            parametros = [regex_busca]
+
+            if uf and uf.strip():
+                query_base += " AND uf = %s"
+                parametros.append(uf.strip().upper())
+
+            cursor.execute(f"""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
                 FROM estabelecimentos_raw 
-                WHERE nome_fantasia ~* %s 
+                {query_base}
                 ORDER BY nome_fantasia ASC 
                 LIMIT %s OFFSET %s
-            """, (regex_busca, limite_busca, offset))
+            """, tuple(parametros + [limite_busca, offset]))
             
             empresas_encontradas = cursor.fetchall()
 
             if not empresas_encontradas and pagina == 1:
                 conn.close()
-                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa com esse nome exato."}
+                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa encontrada com os critérios informados."}
 
-            # Lógica para saber se tem próxima página
             tem_proxima = len(empresas_encontradas) > por_pagina
             if tem_proxima:
-                # Remove o 11º elemento, pois só queremos exibir 10
                 empresas_encontradas = empresas_encontradas[:por_pagina]
 
-            # Validação oficial caso tenha telefone junto
+            # Validação oficial caso tenha telefone junto (apenas na pág 1)
             if telefone and pagina == 1:
                 empresa = empresas_encontradas[0]
                 telefones_brutos = []
@@ -133,7 +141,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                 conn.close()
                 return resposta
 
-            # Retorno da Lista formatada
             lista_resultados = []
             for emp in empresas_encontradas:
                 tels = []
@@ -148,7 +155,8 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                 "pagina_atual": pagina,
                 "tem_proxima": tem_proxima,
                 "nome_buscado": nome,
-                "mensagem": f"Exibindo resultados para a palavra '{nome}'."
+                "uf_buscada": uf,
+                "mensagem": f"Exibindo resultados para '{nome}'" + (f" em {uf.upper()}" if uf else "")
             }
 
         return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
@@ -164,15 +172,18 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
 def index():
     resultado = None
     erro_formulario = None
+    
+    # Captura dados de POST ou GET (para paginação)
     nome = request.form.get("nome") or request.args.get("nome", "").strip()
     telefone = request.form.get("telefone") or request.args.get("telefone", "").strip()
+    uf = request.form.get("uf") or request.args.get("uf", "").strip()
     pagina = request.args.get("pagina", 1, type=int)
 
     if request.method == "POST" or (request.method == "GET" and nome):
         if not nome and not telefone:
             if request.method == "POST": erro_formulario = "Informe nome ou telefone"
         else:
-            resultado = verificar_empresa(nome, telefone, pagina)
+            resultado = verificar_empresa(nome, telefone, pagina, uf)
             
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
@@ -183,8 +194,9 @@ def perfil_usuario():
     if request.method == "POST":
         nome = request.form.get("nome", "").strip()
         telefone = request.form.get("telefone", "").strip()
+        uf = request.form.get("uf", "").strip()
         if nome or telefone:
-            resultado_local = verificar_empresa(nome, telefone)
+            resultado_local = verificar_empresa(nome, telefone, 1, uf)
             pesquisas = session.get('pesquisas_recentes', [])
             pesquisas.insert(0, resultado_local)
             session['pesquisas_recentes'] = pesquisas[:5]
@@ -229,13 +241,6 @@ def denuncia():
 # =========================
 # ADMIN
 # =========================
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    mensagem = None
-    if request.method == "POST": mensagem = "Funcionalidade em manutenção."
-    return render_template("admin.html", mensagem=mensagem)
-
 @app.route("/admin/empresas")
 def listar_empresas():
     if "usuario_logado" not in session: return redirect(url_for('login'))
@@ -277,12 +282,9 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
-
-"""
-  _____   ______          _        _  __ _____  _____ 
- |  __ \ |  ____|   /\   | |      | |/ /|_   _|/ ____|
- | |  | || |__     /  \  | |      | ' /   | | | (___  
- | |  | ||  __|   / /\ \ | |      |  <    | |  \___ \ 
- | |__| || |____ / ____ \| |____  | . \  _| |_ ____) |
- |_____/ |______/_/    \_\______| |_|\_\|_____|_____/ 
-"""
+#  _____   ______          _        _  __ _____  _____ 
+# |  __ \ |  ____|   /\   | |      | |/ /|_   _|/ ____|
+# | |  | || |__     /  \  | |      | ' /   | | | (___  
+# | |  | ||  __|   / /\ \ | |      |  <    | |  \___ \ 
+# | |__| || |____ / ____ \| |____  | . \  _| |_ ____) |
+# |_____/ |______/_/    \_\______| |_|\_\|_____|_____/
