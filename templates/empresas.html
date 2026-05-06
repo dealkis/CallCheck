@@ -9,24 +9,21 @@
 
     <!-- BLOCO DE FILTRO ADICIONADO -->
     <div class="filtros" style="margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #eee; display: flex; align-items: center; gap: 15px;">
-        <form method="GET" action="{{ url_for('listar_empresas') }}" style="display: flex; align-items: center; gap: 10px; margin: 0;">
-            <label style="font-weight: bold; color: #2c3e50;">Filtrar por UF:</label>
-            <select name="uf" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; background: white; color: #333; outline: none;">
-                <option value="">Brasil (Todos)</option>
-                <option value="SP" {% if uf_atual == 'SP' %}selected{% endif %}>São Paulo</option>
-                <option value="RJ" {% if uf_atual == 'RJ' %}selected{% endif %}>Rio de Janeiro</option>
-                <option value="MG" {% if uf_atual == 'MG' %}selected{% endif %}>Minas Gerais</option>
-                <option value="PR" {% if uf_atual == 'PR' %}selected{% endif %}>Paraná</option>
-                <option value="SC" {% if uf_atual == 'SC' %}selected{% endif %}>Santa Catarina</option>
-                <option value="RS" {% if uf_atual == 'RS' %}selected{% endif %}>Rio Grande do Sul</option>
-            </select>
-            <button type="submit" class="btn-ver" style="border: none; cursor: pointer; height: 35px;">Aplicar</button>
-            
-            {% if uf_atual %}
-                <a href="{{ url_for('listar_empresas') }}" style="font-size: 0.85rem; color: #e74c3c; text-decoration: none; margin-left: 5px;">✖ Limpar</a>
-            {% endif %}
-        </form>
-    </div>
+            <form method="GET" action="{{ url_for('listar_empresas') }}" style="display: flex; align-items: center; gap: 10px; margin: 0;">
+                <label style="font-weight: bold; color: #2c3e50;">Digite a UF:</label>
+                
+                <!-- Mudamos de SELECT para INPUT de texto para aceitar qualquer estado (CE, BA, AM, etc) -->
+                <input type="text" name="uf" value="{{ uf_atual }}" placeholder="Ex: CE" maxlength="2" 
+                       style="width: 60px; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; text-transform: uppercase; text-align: center; font-weight: bold;">
+                
+                <button type="submit" class="btn-ver" style="border: none; cursor: pointer; height: 35px;">🔍 Filtrar</button>
+                
+                {% if uf_atual %}
+                    <a href="{{ url_for('listar_empresas') }}" style="font-size: 0.85rem; color: #e74c3c; text-decoration: none; margin-left: 5px;">✖ Limpar</a>
+                {% endif %}
+            </form>
+            <small style="color: #7f8c8d;">(Digite a sigla do estado para buscar)</small>
+        </div>
 
     <div class="tabela-box">
         <table class="tabela-admin">
