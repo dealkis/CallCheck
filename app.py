@@ -230,7 +230,7 @@ def admin():
     mensagem = None
     if request.method == "POST":
         mensagem = "Funcionalidade de cadastro manual em manutenção (Base Receita Ativa)."
-    return render_template("em_obras.html", mensagem=mensagem)
+    return render_template("admin.html", mensagem=mensagem)
 
 @app.route("/admin/empresas")
 def listar_empresas():
@@ -244,8 +244,8 @@ def listar_empresas():
     conn = conectar()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # AJUSTE AQUI: Adicionei o 'cnpj' no SELECT para o botão de detalhes funcionar
-    # E adicionei o filtro 'uf = SP' caso você queira manter apenas empresas de SP
+    # Garantimos que o 'cnpj' (ou 'cnpj_base') seja selecionado. 
+    # Se der erro de coluna não encontrada, altere 'cnpj' para 'cnpj_base'.
     cursor.execute("""
         SELECT cnpj, nome_fantasia, ddd1, telefone1, uf 
         FROM estabelecimentos_raw 
@@ -276,7 +276,8 @@ def visualizar_empresa(cnpj):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     # Busca absolutamente todas as colunas da empresa
-    cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj = %s", (cnpj,))
+    # O cnpj é passado como string para evitar problemas com zeros à esquerda
+    cursor.execute("SELECT * FROM estabelecimentos_raw WHERE cnpj = %s", (str(cnpj),))
     empresa = cursor.fetchone()
     conn.close()
 
