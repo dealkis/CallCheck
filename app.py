@@ -206,8 +206,29 @@ def admin():
 
 @app.route("/admin/empresas")
 def listar_empresas():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    return render_template("em_obras.html")
+    if "usuario_logado" not in session:
+        return redirect(url_for('login'))
+
+    conn = conectar()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Buscamos as primeiras 100 empresas para evitar travamentos
+    # Ordenamos por nome para ficar organizado
+    cursor.execute("""
+        SELECT nome_fantasia, ddd1, telefone1, uf 
+        FROM estabelecimentos_raw 
+        WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''
+        ORDER BY nome_fantasia ASC 
+        LIMIT 100
+    """)
+    empresas_raw = cursor.fetchall()
+    conn.close()
+
+    # Formata os telefones antes de enviar para o HTML
+    for emp in empresas_raw:
+        emp['telefone_formatado'] = formatar_telefone(emp['ddd1'], emp['telefone1'])
+
+    return render_template("empresas.html", empresas=empresas_raw)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
