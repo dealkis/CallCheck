@@ -41,7 +41,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO (OTIMIZADA COM UF E TRAVA DE CARACTERES)
+# VERIFICAÇÃO (OTIMIZADA PARA PARADA PRECOCE)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     conn = conectar()
@@ -81,47 +81,44 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-            # 2. BUSCA POR NOME (OTIMIZADA PARA VELOCIDADE MÁXIMA)
-                    if nome:
-                        if len(nome) < 3:
-                            conn.close()
-                            return {"status": "ERRO", "mensagem": "Digite pelo menos 3 caracteres."}
+        # 2. BUSCA POR NOME (ILIKE NO INÍCIO + OFFSET)
+        if nome:
+            if len(nome) < 3:
+                conn.close()
+                return {"status": "ERRO", "mensagem": "Digite pelo menos 3 caracteres para buscar por nome."}
+
+            por_pagina = 10
+            offset = (pagina - 1) * por_pagina
+            limite_busca = por_pagina + 1 
             
-                        por_pagina = 10
-                        offset = (pagina - 1) * por_pagina
-                        limite_busca = por_pagina + 1 
+            # Mudança para busca por início da palavra (Index-Friendly)
+            termo_busca = f"{nome}%"
+
+            query_base = "WHERE nome_fantasia ILIKE %s"
+            parametros = [termo_busca]
+
+            if uf and uf.strip():
+                query_base += " AND uf = %s"
+                parametros.append(uf.strip().upper())
+
+            cursor.execute(f"""
+                SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+                FROM estabelecimentos_raw 
+                {query_base}
+                ORDER BY nome_fantasia ASC 
+                LIMIT %s OFFSET %s
+            """, tuple(parametros + [limite_busca, offset]))
             
-                        # MUDANÇA CRUCIAL: Usamos ILIKE com % apenas no final.
-                        # Isso permite que o banco use índices e pare de procurar assim que achar os 10 primeiros.
-                        # Se você pesquisar "MAGALU", ele acha "MAGALU LTDA", "MAGALU S.A", etc.
-                        termo_busca = f"{nome}%"
-            
-                        query_base = "WHERE nome_fantasia ILIKE %s"
-                        parametros = [termo_busca]
-            
-                        if uf and uf.strip():
-                            query_base += " AND uf = %s"
-                            parametros.append(uf.strip().upper())
-            
-                        cursor.execute(f"""
-                            SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
-                            FROM estabelecimentos_raw 
-                            {query_base}
-                            ORDER BY nome_fantasia ASC 
-                            LIMIT %s OFFSET %s
-                        """, tuple(parametros + [limite_busca, offset]))
-                        
-                        empresas_encontradas = cursor.fetchall()
+            empresas_encontradas = cursor.fetchall()
 
             if not empresas_encontradas and pagina == 1:
                 conn.close()
-                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa encontrada com os critérios informados."}
+                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa encontrada com este início de nome."}
 
             tem_proxima = len(empresas_encontradas) > por_pagina
             if tem_proxima:
                 empresas_encontradas = empresas_encontradas[:por_pagina]
 
-            # Validação oficial caso tenha telefone junto (apenas na pág 1)
             if telefone and pagina == 1:
                 empresa = empresas_encontradas[0]
                 telefones_brutos = []
@@ -158,7 +155,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 "tem_proxima": tem_proxima,
                 "nome_buscado": nome,
                 "uf_buscada": uf,
-                "mensagem": f"Exibindo resultados para '{nome}'" + (f" em {uf.upper()}" if uf else "")
+                "mensagem": f"Resultados para nomes que começam com '{nome}'."
             }
 
         return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
@@ -174,8 +171,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 def index():
     resultado = None
     erro_formulario = None
-    
-    # Captura dados de POST ou GET (para paginação)
     nome = request.form.get("nome") or request.args.get("nome", "").strip()
     telefone = request.form.get("telefone") or request.args.get("telefone", "").strip()
     uf = request.form.get("uf") or request.args.get("uf", "").strip()
@@ -186,7 +181,6 @@ def index():
             if request.method == "POST": erro_formulario = "Informe nome ou telefone"
         else:
             resultado = verificar_empresa(nome, telefone, pagina, uf)
-            
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
 @app.route("/usuario", methods=["GET", "POST"])
