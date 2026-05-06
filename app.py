@@ -41,7 +41,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# VERIFICAÇÃO (PAGINAÇÃO ADICIONADA)
+# VERIFICAÇÃO (BUSCA POR PALAVRA EXATA COM REGEX)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1):
     conn = conectar()
@@ -52,7 +52,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         telefone_limpo = limpar_telefone(telefone)
 
-        # 1. BUSCA POR TELEFONE (Mantida Original)
+        # 1. BUSCA POR TELEFONE
         if telefone_limpo and not nome:
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, email, uf
@@ -81,32 +81,36 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                     "mensagem": "Telefone não encontrado na base oficial."
                 }
 
-        # 2. BUSCA POR NOME (COM PAGINAÇÃO PARA NÃO TRAVAR)
+        # 2. BUSCA POR NOME (USANDO REGEX \y PARA PALAVRA EXATA)
         if nome:
             por_pagina = 10
             offset = (pagina - 1) * por_pagina
+            
+            # Ajuste da busca: ~* é o operador de Regex Case-Insensitive do Postgres
+            # \\y garante que 'BAR' não vire 'BARRETOS'
+            regex_busca = f'\\y{nome}\\y'
 
-            # Conta total de ocorrências
-            cursor.execute("SELECT COUNT(*) FROM estabelecimentos_raw WHERE nome_fantasia ILIKE %s", (f"%{nome}%",))
+            # Contagem total com Regex
+            cursor.execute("SELECT COUNT(*) FROM estabelecimentos_raw WHERE nome_fantasia ~* %s", (regex_busca,))
             total_resultados = cursor.fetchone()['count']
 
             if total_resultados == 0:
                 conn.close()
-                return {"status": "NAO_CADASTRADA", "mensagem": "Empresa não encontrada."}
+                return {"status": "NAO_CADASTRADA", "mensagem": "Nenhuma empresa com esse nome exato."}
 
-            # Busca limitada com OFFSET
+            # Busca com Regex + Paginação
             cursor.execute("""
                 SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
                 FROM estabelecimentos_raw 
-                WHERE nome_fantasia ILIKE %s 
+                WHERE nome_fantasia ~* %s 
                 ORDER BY nome_fantasia ASC 
                 LIMIT %s OFFSET %s
-            """, (f"%{nome}%", por_pagina, offset))
+            """, (regex_busca, por_pagina, offset))
             
             empresas_encontradas = cursor.fetchall()
             total_paginas = (total_resultados + por_pagina - 1) // por_pagina
 
-            # Caso tenha Telefone junto (Validação Oficial)
+            # Validação oficial caso tenha telefone
             if telefone:
                 empresa = empresas_encontradas[0]
                 telefones_brutos = []
@@ -128,7 +132,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                 conn.close()
                 return resposta
 
-            # Retorno da Lista formatada
             lista_resultados = []
             for emp in empresas_encontradas:
                 tels = []
@@ -144,7 +147,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
                 "pagina_atual": pagina,
                 "total_paginas": total_paginas,
                 "nome_buscado": nome,
-                "mensagem": f"Encontradas {total_resultados} empresas."
+                "mensagem": f"Encontradas {total_resultados} empresas contendo a palavra '{nome}'."
             }
 
         return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
@@ -154,14 +157,12 @@ def verificar_empresa(nome=None, telefone=None, pagina=1):
         return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS PRINCIPAIS
+# ROTAS PRINCIPAIS (MANTIDAS)
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
     erro_formulario = None
-    
-    # Captura dados tanto de POST (form) quanto GET (paginação)
     nome = request.form.get("nome") or request.args.get("nome", "").strip()
     telefone = request.form.get("telefone") or request.args.get("telefone", "").strip()
     pagina = request.args.get("pagina", 1, type=int)
@@ -171,7 +172,6 @@ def index():
             if request.method == "POST": erro_formulario = "Informe nome ou telefone"
         else:
             resultado = verificar_empresa(nome, telefone, pagina)
-            
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
 @app.route("/usuario", methods=["GET", "POST"])
@@ -227,13 +227,6 @@ def denuncia():
 # =========================
 # ADMIN
 # =========================
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    mensagem = None
-    if request.method == "POST": mensagem = "Funcionalidade em manutenção."
-    return render_template("admin.html", mensagem=mensagem)
-
 @app.route("/admin/empresas")
 def listar_empresas():
     if "usuario_logado" not in session: return redirect(url_for('login'))
