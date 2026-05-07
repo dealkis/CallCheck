@@ -23,7 +23,7 @@ except Exception as e:
 
 @contextmanager
 def conectar():
-    """Gerenciador de contexto para gerenciar o ciclo de vida das conexões no Pool"""
+    """Gerenciador de contexto que substitui a antiga conexão direta e utiliza o Pool"""
     if not pool:
         yield None
         return
@@ -52,7 +52,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# LÓGICA DE VERIFICAÇÃO (QUALIDADE DE DADOS & FUZZY SEARCH)
+# LÓGICA DE VERIFICAÇÃO (NOME + TELEFONE + DENÚNCIAS)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     with conectar() as conn:
@@ -63,7 +63,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             telefone_limpo = limpar_telefone(telefone)
 
-            # 1. VERIFICAÇÃO DE DENÚNCIAS (Prioridade de Segurança)
+            # CAMADA ADICIONAL DE SEGURANÇA: VERIFICAR DENÚNCIAS PRIMEIRO
             if telefone_limpo:
                 try:
                     cursor.execute("SELECT * FROM denuncias WHERE telefone = %s LIMIT 1", (telefone_limpo,))
@@ -77,26 +77,27 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                             "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('motivo', 'Atividades suspeitas')}."
                         }
                 except Exception as e:
-                    print("Aviso: Tabela de denúncias ausente.", e)
+                    # Em caso de erro na tabela denuncias, continua o fluxo normal preventivamente
+                    print("Aviso: Tabela de denúncias pode não existir ainda.", e)
 
-            # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS (Fuzzy Search + Index Expressão)
+            # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
             if nome and telefone_limpo:
-                # O operador %% escapa o % para o Psycopg2 não confundir com placeholder
+                termo_busca = f"%{nome}%"
                 query = """
-                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf,
-                           similarity(f_unaccent(nome_fantasia), f_unaccent(%s)) as sim
+                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+
                     FROM estabelecimentos_raw 
-                    WHERE f_unaccent(nome_fantasia) %% f_unaccent(%s) 
+                    WHERE nome_fantasia ILIKE %s 
                       AND ((ddd1 || telefone1) = %s OR (ddd2 || telefone2) = %s)
                 """
-                parametros = [nome, nome, telefone_limpo, telefone_limpo]
+                parametros = [termo_busca, telefone_limpo, telefone_limpo]
                 if uf and uf.strip():
                     query += " AND uf = %s"
                     parametros.append(uf.strip().upper())
-                
-                query += " ORDER BY sim DESC LIMIT 1"
-                
-                cursor.execute(query, tuple(parametros))
+
+                cursor.execute(query + " LIMIT 1", tuple(parametros))
+
+
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -117,6 +118,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
             # CENÁRIO 2: BUSCA APENAS POR TELEFONE
             elif telefone_limpo and not nome:
+
                 cursor.execute("""
                     SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf
                     FROM estabelecimentos_raw 
@@ -124,7 +126,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     LIMIT 1
                 """, (telefone_limpo, telefone_limpo))
                 resultado = cursor.fetchone()
-                
+
                 if resultado:
                     return {
                         "empresa": resultado["nome_fantasia"] or "Empresa Registrada",
@@ -135,29 +137,33 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     }
                 return {"empresa": None, "telefone": telefone, "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
-            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA COM FUZZY SEARCH)
+            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA)
             elif nome:
                 por_pagina = 10
                 offset = (pagina - 1) * por_pagina
-                
-                query_base = """
-                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf,
-                           similarity(f_unaccent(nome_fantasia), f_unaccent(%s)) as sim
-                    FROM estabelecimentos_raw 
-                    WHERE f_unaccent(nome_fantasia) %% f_unaccent(%s)
-                """
-                parametros = [nome, nome]
-                
+                termo_busca = f"%{nome}%"
+                query_base = "WHERE nome_fantasia ILIKE %s"
+                parametros = [termo_busca]
+
+
+
+
+
+
                 if uf and uf.strip():
                     query_base += " AND uf = %s"
                     parametros.append(uf.strip().upper())
 
-                query_base += " ORDER BY sim DESC LIMIT %s OFFSET %s"
-                parametros.extend([por_pagina + 1, offset])
-
-                cursor.execute(query_base, tuple(parametros))
-                empresas = cursor.fetchall()
+                cursor.execute(f"""
+                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+                    FROM estabelecimentos_raw 
+                    {query_base}
+                    ORDER BY nome_fantasia ASC 
+                    LIMIT %s OFFSET %s
+                """, tuple(parametros + [por_pagina + 1, offset]))
                 
+                empresas = cursor.fetchall()
+
                 tem_proxima = len(empresas) > por_pagina
                 lista_resultados = []
                 for emp in empresas[:por_pagina]:
@@ -180,7 +186,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS PÚBLICAS
+# ROTAS PÚBLICAS E DENÚNCIAS
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -203,12 +209,13 @@ def enviar_denuncia():
     telefone = request.form.get("telefone", "").strip()
     motivo = request.form.get("motivo", "").strip()
     telefone_limpo = limpar_telefone(telefone)
-    
+
     if telefone_limpo:
         with conectar() as conn:
             if conn:
                 try:
                     cursor = conn.cursor()
+                    # Cria a tabela se não existir (garantia de funcionamento)
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS denuncias (
                             id SERIAL PRIMARY KEY,
@@ -221,17 +228,19 @@ def enviar_denuncia():
                     conn.commit()
                 except Exception as e:
                     print("Erro ao salvar denúncia:", e)
-                    
+
     return redirect(url_for('index', telefone=telefone))
 
 @app.route("/sobre")
-def sobre(): return render_template("sobre.html")
+def sobre():
+    return render_template("sobre.html")
 
 @app.route("/contato")
-def contato(): return render_template("contato.html")
+def contato():
+    return render_template("contato.html")
 
 # =========================
-# LOGIN E ÁREA LOGADA
+# LOGIN E PERFIL
 # =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -266,7 +275,21 @@ def logout():
     return redirect(url_for('login'))
 
 # =========================
-# ADMINISTRAÇÃO (PRESERVADA)
+# ROTAS ESPECÍFICAS (PRESERVADAS)
+# =========================
+@app.route("/historico")
+def historico():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    pesquisas = session.get('pesquisas_recentes', [])
+    return render_template("em_obras.html", pesquisas=pesquisas)
+
+@app.route("/denuncia")
+def denuncia():
+    if "usuario_logado" not in session: return redirect(url_for('login'))
+    return render_template("em_obras.html")
+
+# =========================
+# ADMINISTRAÇÃO
 # =========================
 @app.route("/admin")
 def admin():
@@ -280,16 +303,16 @@ def listar_empresas():
     pagina = request.args.get('pagina', 1, type=int)
     por_pagina = 100
     offset = (pagina - 1) * por_pagina
-    
+
     with conectar() as conn:
-        if not conn: return "Erro de conexão", 500
+        if not conn: return "Erro de conexão ao banco", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             where = "WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''"
             params = []
             if uf_filtro:
                 where += " AND uf = %s"; params.append(uf_filtro)
-            
+
             cursor.execute(f"SELECT COUNT(*) FROM estabelecimentos_raw {where}", params)
             total_reg = cursor.fetchone()['count']
             cursor.execute(f"SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf FROM estabelecimentos_raw {where} ORDER BY nome_fantasia ASC LIMIT %s OFFSET %s", params + [por_pagina, offset])
@@ -314,15 +337,21 @@ def visualizar_empresa(cnpj_base):
 @app.route("/database_view")
 def database_view():
     if "usuario_logado" not in session: return redirect(url_for('login'))
+
     with conectar() as conn:
-        if conn is None: return "Erro ao conectar", 500
+        if conn is None: return "Erro ao conectar ao banco de dados.", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf FROM estabelecimentos_raw WHERE nome_fantasia IS NOT NULL AND nome_fantasia != '' LIMIT 100")
+            cursor.execute("""
+                SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf 
+                FROM estabelecimentos_raw 
+                WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''
+                LIMIT 100
+            """)
             registros = cursor.fetchall()
             return render_template("database_view.html", registros=registros)
         except Exception as e:
-            return f"Erro: {str(e)}", 500
+            return f"Erro na consulta: {str(e)}", 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
