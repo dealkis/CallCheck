@@ -23,7 +23,7 @@ except Exception as e:
 
 @contextmanager
 def conectar():
-    """Gerenciador de contexto que substitui a antiga conexão direta e utiliza o Pool"""
+    """Gerenciador de contexto para gerenciar o ciclo de vida das conexões no Pool"""
     if not pool:
         yield None
         return
@@ -52,7 +52,7 @@ def formatar_telefone(ddd, num):
         return f"({ddd}) {num}"
 
 # =========================
-# LÓGICA DE VERIFICAÇÃO (NOME + TELEFONE + DENÚNCIAS)
+# LÓGICA DE VERIFICAÇÃO (QUALIDADE DE DADOS & FUZZY SEARCH)
 # =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     with conectar() as conn:
@@ -63,7 +63,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             telefone_limpo = limpar_telefone(telefone)
 
-            # CAMADA ADICIONAL DE SEGURANÇA: VERIFICAR DENÚNCIAS PRIMEIRO
+            # 1. VERIFICAÇÃO DE DENÚNCIAS (Prioridade de Segurança)
             if telefone_limpo:
                 try:
                     cursor.execute("SELECT * FROM denuncias WHERE telefone = %s LIMIT 1", (telefone_limpo,))
@@ -77,17 +77,16 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                             "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('motivo', 'Atividades suspeitas')}."
                         }
                 except Exception as e:
-                    # Em caso de erro na tabela denuncias, continua o fluxo normal preventivamente
-                    print("Aviso: Tabela de denúncias pode não existir ainda.", e)
+                    print("Aviso: Tabela de denúncias ausente.", e)
 
-            # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
+            # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS (Fuzzy Search + Index Expressão)
             if nome and telefone_limpo:
-                # Utiliza immutable_unaccent para Fuzzy Search no nome e aproveita índices de expressão para o telefone
+                # O operador %% escapa o % para o Psycopg2 não confundir com placeholder
                 query = """
                     SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf,
-                           similarity(immutable_unaccent(nome_fantasia), immutable_unaccent(%s)) as sim
+                           similarity(f_unaccent(nome_fantasia), f_unaccent(%s)) as sim
                     FROM estabelecimentos_raw 
-                    WHERE immutable_unaccent(nome_fantasia) % immutable_unaccent(%s) 
+                    WHERE f_unaccent(nome_fantasia) %% f_unaccent(%s) 
                       AND ((ddd1 || telefone1) = %s OR (ddd2 || telefone2) = %s)
                 """
                 parametros = [nome, nome, telefone_limpo, telefone_limpo]
@@ -118,7 +117,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
             # CENÁRIO 2: BUSCA APENAS POR TELEFONE
             elif telefone_limpo and not nome:
-                # O banco utilizará automaticamente os índices de expressão construídos na DDL
                 cursor.execute("""
                     SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf
                     FROM estabelecimentos_raw 
@@ -137,16 +135,16 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     }
                 return {"empresa": None, "telefone": telefone, "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
-            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA)
+            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA COM FUZZY SEARCH)
             elif nome:
                 por_pagina = 10
                 offset = (pagina - 1) * por_pagina
                 
                 query_base = """
                     SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf,
-                           similarity(immutable_unaccent(nome_fantasia), immutable_unaccent(%s)) as sim
+                           similarity(f_unaccent(nome_fantasia), f_unaccent(%s)) as sim
                     FROM estabelecimentos_raw 
-                    WHERE immutable_unaccent(nome_fantasia) % immutable_unaccent(%s)
+                    WHERE f_unaccent(nome_fantasia) %% f_unaccent(%s)
                 """
                 parametros = [nome, nome]
                 
@@ -182,7 +180,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================
-# ROTAS PÚBLICAS E DENÚNCIAS
+# ROTAS PÚBLICAS
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -211,7 +209,6 @@ def enviar_denuncia():
             if conn:
                 try:
                     cursor = conn.cursor()
-                    # Cria a tabela se não existir (garantia de funcionamento)
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS denuncias (
                             id SERIAL PRIMARY KEY,
@@ -228,15 +225,13 @@ def enviar_denuncia():
     return redirect(url_for('index', telefone=telefone))
 
 @app.route("/sobre")
-def sobre():
-    return render_template("sobre.html")
+def sobre(): return render_template("sobre.html")
 
 @app.route("/contato")
-def contato():
-    return render_template("contato.html")
+def contato(): return render_template("contato.html")
 
 # =========================
-# LOGIN E PERFIL
+# LOGIN E ÁREA LOGADA
 # =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -271,21 +266,7 @@ def logout():
     return redirect(url_for('login'))
 
 # =========================
-# ROTAS ESPECÍFICAS (PRESERVADAS)
-# =========================
-@app.route("/historico")
-def historico():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    pesquisas = session.get('pesquisas_recentes', [])
-    return render_template("em_obras.html", pesquisas=pesquisas)
-
-@app.route("/denuncia")
-def denuncia():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    return render_template("em_obras.html")
-
-# =========================
-# ADMINISTRAÇÃO
+# ADMINISTRAÇÃO (PRESERVADA)
 # =========================
 @app.route("/admin")
 def admin():
@@ -301,7 +282,7 @@ def listar_empresas():
     offset = (pagina - 1) * por_pagina
     
     with conectar() as conn:
-        if not conn: return "Erro de conexão ao banco", 500
+        if not conn: return "Erro de conexão", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             where = "WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''"
@@ -333,21 +314,15 @@ def visualizar_empresa(cnpj_base):
 @app.route("/database_view")
 def database_view():
     if "usuario_logado" not in session: return redirect(url_for('login'))
-    
     with conectar() as conn:
-        if conn is None: return "Erro ao conectar ao banco de dados.", 500
+        if conn is None: return "Erro ao conectar", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("""
-                SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf 
-                FROM estabelecimentos_raw 
-                WHERE nome_fantasia IS NOT NULL AND nome_fantasia != ''
-                LIMIT 100
-            """)
+            cursor.execute("SELECT cnpj_base, nome_fantasia, ddd1, telefone1, uf FROM estabelecimentos_raw WHERE nome_fantasia IS NOT NULL AND nome_fantasia != '' LIMIT 100")
             registros = cursor.fetchall()
             return render_template("database_view.html", registros=registros)
         except Exception as e:
-            return f"Erro na consulta: {str(e)}", 500
+            return f"Erro: {str(e)}", 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
