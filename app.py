@@ -82,19 +82,22 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
             # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
             if nome and telefone_limpo:
-                termo_busca = f"%{nome}%"
+                # Utiliza immutable_unaccent para Fuzzy Search no nome e aproveita índices de expressão para o telefone
                 query = """
-                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
+                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf,
+                           similarity(immutable_unaccent(nome_fantasia), immutable_unaccent(%s)) as sim
                     FROM estabelecimentos_raw 
-                    WHERE nome_fantasia ILIKE %s 
+                    WHERE immutable_unaccent(nome_fantasia) % immutable_unaccent(%s) 
                       AND ((ddd1 || telefone1) = %s OR (ddd2 || telefone2) = %s)
                 """
-                parametros = [termo_busca, telefone_limpo, telefone_limpo]
+                parametros = [nome, nome, telefone_limpo, telefone_limpo]
                 if uf and uf.strip():
                     query += " AND uf = %s"
                     parametros.append(uf.strip().upper())
-
-                cursor.execute(query + " LIMIT 1", tuple(parametros))
+                
+                query += " ORDER BY sim DESC LIMIT 1"
+                
+                cursor.execute(query, tuple(parametros))
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -115,6 +118,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
             # CENÁRIO 2: BUSCA APENAS POR TELEFONE
             elif telefone_limpo and not nome:
+                # O banco utilizará automaticamente os índices de expressão construídos na DDL
                 cursor.execute("""
                     SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf
                     FROM estabelecimentos_raw 
@@ -137,21 +141,23 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             elif nome:
                 por_pagina = 10
                 offset = (pagina - 1) * por_pagina
-                termo_busca = f"%{nome}%"
-                query_base = "WHERE nome_fantasia ILIKE %s"
-                parametros = [termo_busca]
+                
+                query_base = """
+                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf,
+                           similarity(immutable_unaccent(nome_fantasia), immutable_unaccent(%s)) as sim
+                    FROM estabelecimentos_raw 
+                    WHERE immutable_unaccent(nome_fantasia) % immutable_unaccent(%s)
+                """
+                parametros = [nome, nome]
+                
                 if uf and uf.strip():
                     query_base += " AND uf = %s"
                     parametros.append(uf.strip().upper())
 
-                cursor.execute(f"""
-                    SELECT nome_fantasia, ddd1, telefone1, ddd2, telefone2, uf 
-                    FROM estabelecimentos_raw 
-                    {query_base}
-                    ORDER BY nome_fantasia ASC 
-                    LIMIT %s OFFSET %s
-                """, tuple(parametros + [por_pagina + 1, offset]))
-                
+                query_base += " ORDER BY sim DESC LIMIT %s OFFSET %s"
+                parametros.extend([por_pagina + 1, offset])
+
+                cursor.execute(query_base, tuple(parametros))
                 empresas = cursor.fetchall()
                 
                 tem_proxima = len(empresas) > por_pagina
