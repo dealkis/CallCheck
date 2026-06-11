@@ -13,7 +13,7 @@ app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
 # =========================
 MIN_CONNS = 1
 MAX_CONNS = 20
-DB_URL = os.getenv("DATABASE_URL", "postgresql://banco_de_dados_callcheck_user:evZM58eGjtd0qMGoDveRi1DGTvOyd2d7@dpg-d7sdccd0lvsc73ae488g-a.oregon-postgres.render.com/banco_de_dados_callcheck")
+DB_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_o51wyEXnCMpg@ep-plain-morning-ac3tue24-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
 
 pool = None
 try:
