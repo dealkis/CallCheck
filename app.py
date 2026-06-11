@@ -44,22 +44,25 @@ def formatar_telefone(ddd, num):
         return "Não informado"
     num = "".join(filter(str.isdigit, num))
     ddd = "".join(filter(str.isdigit, ddd))
+    
+    # Nova formatação solicitada: +55 (DDD) XXXX-XXXX
     if len(num) == 9:
-        return f"({ddd}) {num[0]} {num[1:5]}-{num[5:]}"
+        return f"+55 ({ddd}) {num[0]} {num[1:5]}-{num[5:]}"
     elif len(num) == 8:
-        return f"({ddd}) {num[0:4]}-{num[4:]}"
+        return f"+55 ({ddd}) {num[0:4]}-{num[4:]}"
     else:
-        return f"({ddd}) {num}"
+        return f"+55 ({ddd}) {num}"
 
 def formatar_numero_completo(numero):
-    """Auxiliar para aplicar a formatação antiga (DDD + Num) com a nova estrutura de coluna única"""
+    """Aplica a formatação +55 (DDD) XXXX-XXXX"""
     if not numero: return "Não informado"
     limpo = limpar_telefone(numero)
-    # Se for um número tipo 0800 ou muito curto, apenas o retornamos limpo/padrão
+    
+    # Se for um número tipo 0800 ou muito curto, retorna sem o +55
     if limpo.startswith('0800') or len(limpo) < 10:
         return numero
     else:
-        # Puxamos o ddd como os 2 primeiros números e o restante
+        # Pega os 2 primeiros dígitos como DDD e o restante como número
         return formatar_telefone(limpo[:2], limpo[2:])
 
 # =========================
