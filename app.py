@@ -42,10 +42,17 @@ def limpar_telefone(tel):
 def formatar_telefone(ddd, num):
     if not ddd or not num:
         return "Não informado"
+    
+    # Limpa tudo e garante que ddd e num sejam apenas dígitos
     num = "".join(filter(str.isdigit, num))
     ddd = "".join(filter(str.isdigit, ddd))
     
-    # Nova formatação solicitada: +55 (DDD) XXXX-XXXX
+    # SE O DDD FOR "55", IGNORAMOS E PEGAMOS O PRÓXIMO COMO DDD REAL
+    if ddd == "55" and len(num) >= 2:
+        ddd = num[:2]
+        num = num[2:]
+        
+    # Formatação final: +55 (DDD) XXXX-XXXX
     if len(num) == 9:
         return f"+55 ({ddd}) {num[0]} {num[1:5]}-{num[5:]}"
     elif len(num) == 8:
