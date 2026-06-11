@@ -8,9 +8,9 @@ import os
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
 
-# =========================================
-# CONEXÃO COM POOL DE CONEXÕES (PRESERVADO)
-# =========================================
+# =========================
+# CONEXÃO COM POOL DE CONEXÕES
+# =========================
 MIN_CONNS = 1
 MAX_CONNS = 20
 DB_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_o51wyEXnCMpg@ep-plain-morning-ac3tue24-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
@@ -23,7 +23,7 @@ except Exception as e:
 
 @contextmanager
 def conectar():
-    """Gerenciador de contexto que gerencia o Pool de conexões"""
+    """Gerenciador de contexto que substitui a antiga conexão direta e utiliza o Pool"""
     if not pool:
         yield None
         return
@@ -33,9 +33,9 @@ def conectar():
     finally:
         pool.putconn(conn)
 
-# =========================================
-# UTILITÁRIOS (PRESERVADOS)
-# =========================================
+# =========================
+# UTILITÁRIOS
+# =========================
 def limpar_telefone(tel):
     return ''.join(filter(str.isdigit, tel or ""))
 
@@ -51,9 +51,20 @@ def formatar_telefone(ddd, num):
     else:
         return f"({ddd}) {num}"
 
-# =========================================
-# LÓGICA DE VERIFICAÇÃO ADAPTADA (JOINs)
-# =========================================
+def formatar_numero_completo(numero):
+    """Auxiliar para aplicar a formatação antiga (DDD + Num) com a nova estrutura de coluna única"""
+    if not numero: return "Não informado"
+    limpo = limpar_telefone(numero)
+    # Se for um número tipo 0800 ou muito curto, apenas o retornamos limpo/padrão
+    if limpo.startswith('0800') or len(limpo) < 10:
+        return numero
+    else:
+        # Puxamos o ddd como os 2 primeiros números e o restante
+        return formatar_telefone(limpo[:2], limpo[2:])
+
+# =========================
+# LÓGICA DE VERIFICAÇÃO (NOME + TELEFONE + DENÚNCIAS)
+# =========================
 def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
     with conectar() as conn:
         if conn is None:
@@ -63,44 +74,51 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             telefone_limpo = limpar_telefone(telefone)
 
-            # CAMADA DE SEGURANÇA: VERIFICAR DENÚNCIAS VIA RELACIONAMENTO
+            # CAMADA ADICIONAL DE SEGURANÇA: VERIFICAR DENÚNCIAS PRIMEIRO
+            # Agora utilizando JOIN entre a tabela 'denuncia' e 'telefone'
             if telefone_limpo:
-                cursor.execute("""
-                    SELECT d.tipo, d.descricao, t.numero 
-                    FROM denuncia d
-                    JOIN telefone t ON d.telefone_id = t.id
-                    WHERE t.numero = %s 
-                    LIMIT 1
-                """, (telefone_limpo,))
-                denuncia = cursor.fetchone()
-                if denuncia:
-                    return {
-                        "empresa": nome or "Número Desconhecido",
-                        "telefone": telefone,
-                        "status": "RISCO",
-                        "uf": "N/A",  # Novo esquema não possui coluna UF
-                        "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('descricao') or denuncia.get('tipo', 'Atividades suspeitas')}."
-                    }
+                try:
+                    cursor.execute("""
+                        SELECT d.descricao 
+                        FROM denuncia d
+                        JOIN telefone t ON d.telefone_id = t.id
+                        WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s 
+                        LIMIT 1
+                    """, (telefone_limpo,))
+                    denuncia = cursor.fetchone()
+                    if denuncia:
+                        return {
+                            "empresa": nome or "Número Desconhecido",
+                            "telefone": telefone,
+                            "status": "RISCO",
+                            "uf": uf or "",  # UF é retornado para compatibilidade com o front, mas não é usado na DB
+                            "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('descricao', 'Atividades suspeitas')}."
+                        }
+                except Exception as e:
+                    print("Aviso: Tabela de denúncias ou colunas podem estar indisponíveis.", e)
 
             # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
             if nome and telefone_limpo:
                 termo_busca = f"%{nome}%"
                 query = """
-                    SELECT e.nome AS nome_fantasia, t.numero, e.verificada
+                    SELECT e.nome AS empresa_nome, t.numero, e.verificada
                     FROM empresa e
-                    JOIN telefone t ON e.id = t.empresa_id
-                    WHERE e.nome ILIKE %s AND t.numero = %s
+                    JOIN telefone t ON t.empresa_id = e.id
+                    WHERE e.nome ILIKE %s 
+                      AND REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s
+                    LIMIT 1
                 """
-                cursor.execute(query + " LIMIT 1", (termo_busca, telefone_limpo))
+                # Observação: Filtragem de UF foi removida conforme a nova modelagem relacional
+                cursor.execute(query, (termo_busca, telefone_limpo))
                 resultado = cursor.fetchone()
 
                 if resultado:
                     return {
-                        "empresa": resultado["nome_fantasia"],
-                        "telefone": resultado["numero"],
-                        "status": "OFICIAL",
-                        "uf": "N/A",
-                        "mensagem": "Número verificado e seguro!"
+                        "empresa": resultado["empresa_nome"],
+                        "telefone": formatar_numero_completo(resultado["numero"]),
+                        "status": "OFICIAL" if resultado["verificada"] else "NAO_VERIFICADA",
+                        "uf": uf or "",
+                        "mensagem": "Número verificado e seguro!" if resultado["verificada"] else "Número encontrado, mas a empresa não possui selo de verificação."
                     }
                 else:
                     return {
@@ -113,21 +131,22 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             # CENÁRIO 2: BUSCA APENAS POR TELEFONE
             elif telefone_limpo and not nome:
                 cursor.execute("""
-                    SELECT e.nome AS nome_fantasia, t.numero
-                    FROM empresa e
-                    JOIN telefone t ON e.id = t.empresa_id
-                    WHERE t.numero = %s
+                    SELECT e.nome AS empresa_nome, t.numero, e.verificada
+                    FROM telefone t
+                    LEFT JOIN empresa e ON t.empresa_id = e.id
+                    WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s
                     LIMIT 1
                 """, (telefone_limpo,))
                 resultado = cursor.fetchone()
 
                 if resultado:
+                    empresa_nome = resultado["empresa_nome"] or "Empresa Registrada"
                     return {
-                        "empresa": resultado["nome_fantasia"] or "Empresa Registrada",
-                        "telefone": resultado["numero"],
+                        "empresa": empresa_nome,
+                        "telefone": formatar_numero_completo(resultado["numero"]),
                         "status": "ENCONTRADO",
-                        "uf": "N/A",
-                        "mensagem": "Telefone vinculado a uma empresa cadastrada."
+                        "uf": uf or "",
+                        "mensagem": "Telefone vinculado a uma empresa."
                     }
                 return {"empresa": None, "telefone": telefone, "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
@@ -136,11 +155,10 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 por_pagina = 10
                 offset = (pagina - 1) * por_pagina
                 termo_busca = f"%{nome}%"
-
+                
                 cursor.execute("""
-                    SELECT e.nome AS nome_fantasia, t.numero
+                    SELECT e.id, e.nome, e.verificada
                     FROM empresa e
-                    LEFT JOIN telefone t ON e.id = t.empresa_id AND t.principal = TRUE
                     WHERE e.nome ILIKE %s
                     ORDER BY e.nome ASC 
                     LIMIT %s OFFSET %s
@@ -148,14 +166,17 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 
                 empresas = cursor.fetchall()
                 tem_proxima = len(empresas) > por_pagina
-                lista_resultados = []
                 
+                lista_resultados = []
                 for emp in empresas[:por_pagina]:
-                    tels = [emp['numero']] if emp['numero'] else []
+                    # Agora os telefones da empresa precisam ser buscados pelo INNER JOIN / chave estrangeira
+                    cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (emp['id'],))
+                    telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall()]
+                    
                     lista_resultados.append({
-                        "empresa": emp["nome_fantasia"], 
-                        "telefones": tels, 
-                        "uf": "N/A"
+                        "empresa": emp["nome"], 
+                        "telefones": telefones, 
+                        "uf": uf or ""
                     })
 
                 return {
@@ -172,9 +193,9 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
         except Exception as e:
             return {"status": "ERRO", "mensagem": str(e)}
 
-# =========================================
+# =========================
 # ROTAS PÚBLICAS E DENÚNCIAS
-# =========================================
+# =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
     resultado = None
@@ -201,49 +222,36 @@ def enviar_denuncia():
         with conectar() as conn:
             if conn:
                 try:
-                    cursor = conn.cursor(cursor_factory=RealDictCursor)
+                    cursor = conn.cursor() # Usamos o cursor padrão aqui
                     
-                    # 1. Garante integridade: Procura ou cria Usuário de auditoria padrão
-                    cursor.execute("SELECT id FROM usuario LIMIT 1")
-                    user_row = cursor.fetchone()
-                    usuario_id = user_row['id'] if user_row else 1
-                    
-                    # 2. Procura ou cria o Telefone/Empresa base para amarrar a FK de denúncia
-                    cursor.execute("SELECT id FROM telefone WHERE numero = %s LIMIT 1", (telefone_limpo,))
+                    # 1. Verifica se telefone existe na base 'telefone'
+                    cursor.execute("""
+                        SELECT id FROM telefone 
+                        WHERE REGEXP_REPLACE(numero, '\D', '', 'g') = %s 
+                        LIMIT 1
+                    """, (telefone_limpo,))
                     tel_row = cursor.fetchone()
                     
                     if tel_row:
-                        telefone_id = tel_row['id']
+                        telefone_id = tel_row[0]
                     else:
-                        cursor.execute("INSERT INTO empresa (nome, cnpj, verificada) VALUES (%s, %s, FALSE) RETURNING id", ("Origem Desconhecida", "00000000000000"))
-                        nova_emp_id = cursor.fetchone()['id']
-                        cursor.execute("INSERT INTO telefone (numero, empresa_id, tipo, suspeito, principal) VALUES (%s, %s, 'desconhecido', TRUE, TRUE) RETURNING id", (telefone_limpo, nova_emp_id))
-                        telefone_id = cursor.fetchone()['id']
-
-                    # 3. Classifica o tipo de acordo com a regra ENUM informada
-                    tipo_enum = 'spam'
-                    motivo_lower = motivo.lower()
-                    if 'golpe' in motivo_lower: tipo_enum = 'golpe'
-                    elif 'fraude' in motivo_lower: tipo_enum = 'fraude'
-
-                    # 4. Grava na nova tabela de denúncias relacionais
-                    cursor.execute("""
-                        INSERT INTO denuncia (telefone_id, tipo, descricao, data_registro, usuario_id) 
-                        VALUES (%s, %s, %s, NOW(), %s)
-                    """, (telefone_id, tipo_enum, motivo, usuario_id))
+                        # 2. Insere telefone se não existir (desconhecido, como suspeito)
+                        cursor.execute("""
+                            INSERT INTO telefone (numero, tipo, suspeito, principal) 
+                            VALUES (%s, 'desconhecido', true, false) 
+                            RETURNING id
+                        """, (telefone,)) 
+                        telefone_id = cursor.fetchone()[0]
                     
-                    # 5. Atualiza o status do telefone para suspeito
-                    cursor.execute("UPDATE telefone SET suspeito = TRUE WHERE id = %s", (telefone_id,))
-                    
-                    # 6. Registra no histórico de ações
+                    # 3. Insere a nova denúncia usando a chave estrangeira
                     cursor.execute("""
-                        INSERT INTO historico_acao (usuario_id, acao, descricao, ip, realizado_em) 
-                        VALUES (%s, 'criou_denuncia', %s, %s, NOW())
-                    """, (usuario_id, f"Denúncia cadastrada para o número: {telefone_limpo}", request.remote_addr))
+                        INSERT INTO denuncia (telefone_id, tipo, descricao) 
+                        VALUES (%s, 'outros', %s)
+                    """, (telefone_id, motivo))
                     
                     conn.commit()
                 except Exception as e:
-                    print("Erro ao salvar denúncia na estrutura relacional:", e)
+                    print("Erro ao salvar denúncia:", e)
 
     return redirect(url_for('index', telefone=telefone))
 
@@ -255,42 +263,42 @@ def sobre():
 def contato():
     return render_template("contato.html")
 
-# =========================================
-# LOGIN E PERFIL (PRESERVADOS E ADAPTADOS)
-# =========================================
+# =========================
+# LOGIN E PERFIL
+# =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "usuario_logado" in session: return redirect(url_for('perfil_usuario'))
     erro = None
     if request.method == "POST":
-        # Mantém a autenticação mockada existente para não quebrar fluxos administrativos antigos
-        if request.form.get("usuario") == "admin" and request.form.get("senha") == "123":
-            session["usuario_logado"] = "admin"
-            
-            # Grava a sessão na tabela 'sessao' caso exista um usuário administrador básico na base
-            with conectar() as conn:
-                if conn:
-                    try:
-                        cursor = conn.cursor(cursor_factory=RealDictCursor)
-                        cursor.execute("SELECT id FROM usuario WHERE nivel = 'admin' LIMIT 1")
-                        user_admin = cursor.fetchone()
-                        uid = user_admin['id'] if user_admin else 1
-                        
-                        cursor.execute("""
-                            INSERT INTO sessao (usuario_id, token, ip, user_agent, criado_em, expira_em, ativo)
-                            VALUES (%s, 'token_admin_mock', %s, %s, NOW(), NOW() + INTERVAL '1 day', TRUE)
-                        """, (uid, request.remote_addr, request.headers.get('User-Agent', '')))
-                        
-                        cursor.execute("""
-                            INSERT INTO historico_acao (usuario_id, acao, descricao, ip, realizado_em)
-                            VALUES (%s, 'login', 'Administrador logou no sistema', %s, NOW())
-                        """, (uid, request.remote_addr))
-                        conn.commit()
-                    except Exception as e:
-                        print("Erro ao registrar metadados de sessão:", e)
-                        
-            return redirect(url_for('perfil_usuario'))
-        erro = "Usuário ou senha incorretos."
+        email_login = request.form.get("usuario") # Capturamos do mesmo campo name="usuario" no template
+        senha = request.form.get("senha")
+        
+        with conectar() as conn:
+            if conn:
+                try:
+                    cursor = conn.cursor(cursor_factory=RealDictCursor)
+                    # Verifica login real buscando na nova tabela "usuario"
+                    cursor.execute("""
+                        SELECT id, nome, email 
+                        FROM usuario 
+                        WHERE email = %s AND senha = %s 
+                        LIMIT 1
+                    """, (email_login, senha))
+                    user = cursor.fetchone()
+                    
+                    if user:
+                        session["usuario_logado"] = user["nome"]
+                        session["usuario_id"] = user["id"]
+                        return redirect(url_for('perfil_usuario'))
+                    else:
+                        erro = "Usuário ou senha incorretos."
+                except Exception as e:
+                    print("Erro no DB durante o login:", e)
+                    erro = "Ocorreu um erro ao processar o login."
+            else:
+                erro = "Erro de conexão ao banco de dados."
+
     return render_template("login.html", erro=erro)
 
 @app.route("/usuario", methods=["GET", "POST"])
@@ -314,9 +322,9 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# =========================================
+# =========================
 # ROTAS ESPECÍFICAS (PRESERVADAS)
-# =========================================
+# =========================
 @app.route("/historico")
 def historico():
     if "usuario_logado" not in session: return redirect(url_for('login'))
@@ -328,9 +336,9 @@ def denuncia():
     if "usuario_logado" not in session: return redirect(url_for('login'))
     return render_template("em_obras.html")
 
-# =========================================
-# ADMINISTRAÇÃO ADAPTADA COM SEGURANÇA
-# =========================================
+# =========================
+# ADMINISTRAÇÃO
+# =========================
 @app.route("/admin")
 def admin():
     if "usuario_logado" not in session: return redirect(url_for('login'))
@@ -349,19 +357,27 @@ def listar_empresas():
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             
-            cursor.execute("SELECT COUNT(*) FROM empresa")
+            # Conta o total para paginação usando a tabela 'empresa'
+            cursor.execute("SELECT COUNT(*) FROM empresa WHERE nome IS NOT NULL AND nome != ''")
             total_reg = cursor.fetchone()['count']
             
-            # Mapeamento alias explicito para manter compatibilidade absoluta com os campos legados do template
-            cursor.execute("""
-                SELECT e.cnpj AS cnpj_base, e.nome AS nome_fantasia, '' AS ddd1, t.numero AS telefone1, 'N/A' AS uf 
+            # Mapamento no SQL com apelidos para renderizar corretamente no "empresas.html"
+            query = """
+                SELECT 
+                    e.cnpj AS cnpj_base, 
+                    e.nome AS nome_fantasia, 
+                    '' AS ddd1, 
+                    t.numero AS telefone1, 
+                    '' AS uf 
                 FROM empresa e
-                LEFT JOIN telefone t ON e.id = t.empresa_id AND t.principal = TRUE
+                LEFT JOIN telefone t ON t.empresa_id = e.id AND t.principal = true
+                WHERE e.nome IS NOT NULL AND e.nome != ''
                 ORDER BY e.nome ASC 
                 LIMIT %s OFFSET %s
-            """, (por_pagina, offset))
-            
+            """
+            cursor.execute(query, (por_pagina, offset))
             empresas = cursor.fetchall()
+            
             return render_template("empresas.html", empresas=empresas, pagina=pagina, total_paginas=(total_reg // por_pagina) + 1, total_registros=total_reg, uf_atual=uf_filtro)
         except Exception as e:
             return str(e), 500
@@ -373,64 +389,70 @@ def visualizar_empresa(cnpj_base):
         if not conn: return "Erro de conexão", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # Reconstrução relacional para simular o dicionário plano esperado na tela de detalhes
+            
+            # Busca a empresa pelo CNPJ, forçando chave similar para compatibilidade de template
             cursor.execute("""
-                SELECT e.nome AS nome_fantasia, e.cnpj AS cnpj_base, '' AS ddd1, t.numero AS telefone1, 'N/A' AS uf, e.verificada
-                FROM empresa e
-                LEFT JOIN telefone t ON e.id = t.empresa_id AND t.principal = TRUE
-                WHERE e.cnpj = %s 
-                LIMIT 1
+                SELECT id, nome AS nome_fantasia, cnpj, verificada 
+                FROM empresa 
+                WHERE cnpj = %s LIMIT 1
             """, (str(cnpj_base),))
             empresa = cursor.fetchone()
+            
+            if empresa:
+                # Busca telefones vinculados a esta empresa
+                cursor.execute("""
+                    SELECT numero, tipo, suspeito, principal 
+                    FROM telefone 
+                    WHERE empresa_id = %s
+                """, (empresa['id'],))
+                telefones = cursor.fetchall()
+                
+                # Injeta dados de telefones dinamicamente no dict pra o loop for renderizar
+                for idx, t in enumerate(telefones):
+                    empresa[f"telefone_{idx+1}"] = t['numero']
+                    empresa[f"tipo_{idx+1}"] = t['tipo']
+                    empresa[f"suspeito_{idx+1}"] = "Sim" if t['suspeito'] else "Não"
+
             return render_template("detalhes_empresa.html", empresa=empresa)
         except Exception as e:
             return str(e), 500
 
-@app.route("/database_view", methods=["GET", "POST"])
+@app.route("/database_view")
 def database_view():
     if "usuario_logado" not in session: return redirect(url_for('login'))
-    mensagem = None
 
     with conectar() as conn:
         if conn is None: return "Erro ao conectar ao banco de dados.", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            
-            # PROCESSAMENTO DO FORMULÁRIO DE CADASTRO CONTIDO NO TEMPLATE
-            if request.method == "POST":
-                nome = request.form.get("nome", "").strip()
-                telefone = request.form.get("telefone", "").strip()
-                telefone_limpo = limpar_telefone(telefone)
-                
-                # Insere dados de maneira atômica respeitando restrições relacionais
-                cursor.execute("INSERT INTO empresa (nome, cnpj, verificada) VALUES (%s, %s, TRUE) RETURNING id", (nome, telefone_limpo[:14] if telefone_limpo else "00000000000000"))
-                nova_emp_id = cursor.fetchone()['id']
-                
-                if telefone_limpo:
-                    cursor.execute("INSERT INTO telefone (numero, empresa_id, tipo, suspeito, principal) VALUES (%s, %s, 'oficial', FALSE, TRUE)", (telefone_limpo, nova_emp_id))
-                
-                # Grava no histórico administrativo
-                cursor.execute("SELECT id FROM usuario LIMIT 1")
-                u_row = cursor.fetchone()
-                uid = u_row['id'] if u_row else 1
-                cursor.execute("INSERT INTO historico_acao (usuario_id, acao, descricao, ip, realizado_em) VALUES (%s, 'cadastrou_empresa', %s, %s, NOW())", (uid, f"Empresa {nome} criada via painel.", request.remote_addr))
-                
-                conn.commit()
-                mensagem = "Empresa e Telefone Oficial salvos com sucesso!"
-
-            # CARREGAMENTO DA VIEW
+            # Replicado o mapeamento "AS" para simular o modelo flat anterior perfeitamente
             cursor.execute("""
-                SELECT e.cnpj AS cnpj_base, e.nome AS nome_fantasia, '' AS ddd1, t.numero AS telefone1, 'N/A' AS uf 
+                SELECT 
+                    e.cnpj AS cnpj_base, 
+                    e.nome AS nome_fantasia, 
+                    '' AS ddd1, 
+                    t.numero AS telefone1, 
+                    '' AS uf 
                 FROM empresa e
-                LEFT JOIN telefone t ON e.id = t.empresa_id AND t.principal = TRUE
+                LEFT JOIN telefone t ON t.empresa_id = e.id AND t.principal = true
                 WHERE e.nome IS NOT NULL AND e.nome != ''
+                ORDER BY e.nome ASC
                 LIMIT 100
             """)
             registros = cursor.fetchall()
-            return render_template("database_view.html", registros=registros, mensagem=mensagem)
+            return render_template("database_view.html", registros=registros)
         except Exception as e:
-            if conn: conn.rollback()
-            return f"Erro na operação: {str(e)}", 500
+            return f"Erro na consulta: {str(e)}", 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+'''
+_____  ______          _      _  __ _____  _____ 
+|  __ \|  ____|   /\   | |    | |/ /|_   _|/ ____|
+| |  | | |__     /  \  | |    | ' /   | | | (___  
+| |  | |  __|   / /\ \ | |    |  <    | |  \___ \ 
+| |__| | |____ / ____ \| |____| . \  _| |_ ____) |
+|_____/|______/_/    \_\______|_|\_\|_____|_____/
+
+'''
