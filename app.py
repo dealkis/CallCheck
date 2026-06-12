@@ -160,12 +160,16 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 resultado = cursor.fetchone()
 
                 if resultado:
+                    # Forçamos o status para 'OFICIAL' para aproveitar o padrão do seu frontend,
+                    # mas personalizamos a mensagem caso venha da Receita Federal.
+                    mensagem_final = "Número verificado e seguro!" if resultado["verificada"] else "Verificado pela base da Receita Federal."
+                    
                     return {
                         "empresa": resultado["empresa_nome"],
                         "telefone": formatar_numero_completo(resultado["numero"]),
-                        "status": "OFICIAL" if resultado["verificada"] else "NAO_VERIFICADA",
+                        "status": "OFICIAL",  # <--- Mudado para sempre mandar OFICIAL
                         "uf": uf or "",
-                        "mensagem": "Número verificado e seguro!" if resultado["verificada"] else "Número encontrado e validado com a empresa."
+                        "mensagem": mensaje_final
                     }
                 else:
                     return {
