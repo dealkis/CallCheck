@@ -380,17 +380,28 @@ function CallCheckPage() {
                             </div>
                           ))}
 
-                          {(temProxima || currentPage > 1) && (
-                            <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-white/10 w-full">
-                              {currentPage > 1 && (
-                                <Button
-                                  onClick={() => handleValidation(currentPage - 1)}
-                                  disabled={isValidating}
-                                  className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm py-1 px-4 h-9 rounded-lg transition-colors"
-                                >
-                                  ⬅️ Anterior
-                                </Button>
-                              )}
+                         {/* Controles de Paginação Sempre Visíveis */}
+                          <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-white/10 w-full">
+                            <Button
+                              onClick={() => handleValidation(currentPage - 1)}
+                              disabled={isValidating || currentPage <= 1}
+                              className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm py-1 px-4 h-9 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              ⬅️ Anterior
+                            </Button>
+                            
+                            <span className="text-gray-400 text-sm font-medium">
+                              Página {currentPage}
+                            </span>
+
+                            <Button
+                              onClick={() => handleValidation(currentPage + 1)}
+                              disabled={isValidating || !temProxima}
+                              className="bg-[#22C55E] hover:bg-[#1fba58] text-white text-sm py-1 px-4 h-9 rounded-lg shadow-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              Próxima ➡️
+                            </Button>
+                          </div>
                               
                               <span className="text-gray-400 text-sm font-medium">
                                 Página {currentPage}
