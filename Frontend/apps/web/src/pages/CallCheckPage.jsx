@@ -15,7 +15,7 @@ import {
   Building2, 
   MessageSquareWarning, 
   Search,
-  ShieldAlert // Ícone adicionado para o formulário de denúncia
+  ShieldAlert 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -155,43 +155,52 @@ function CallCheckPage() {
     }
   };
 
- // === FUNÇÃO CORRIGIDA NO JSX ===
-const handleEnviarDenuncia = async () => {
-  if (!tipoDenuncia) return;
-  setIsSubmittingDenuncia(true);
+  // === FUNÇÃO CORRIGIDA PARA ENVIAR NÚMERO PADRONIZADO ===
+  const handleEnviarDenuncia = async () => {
+    if (!tipoDenuncia) return;
+    setIsSubmittingDenuncia(true);
 
-  try {
-    let telefoneLimpo = phoneInput ? phoneInput.replace(/\D/g, '') : '';
-    
-    const response = await fetch('https://callcheck.onrender.com/api/denuncias', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        telefone: telefoneLimpo, 
-        empresa: companyInput,
-        tipo: tipoDenuncia, // Envia GOLPE, SPAM, FALSO_ATENDIMENTO
-        descricao: descricaoDenuncia
-      })
-    });
+    try {
+      let telefoneLimpo = '';
+      if (phoneInput) {
+        telefoneLimpo = phoneInput.replace(/\D/g, '');
+        // Aplicando a exata formatação da validação para não haver inconsistência no banco
+        if (telefoneLimpo.length === 8 || telefoneLimpo.length === 9) {
+          telefoneLimpo = '5511' + telefoneLimpo; 
+        } 
+        else if (telefoneLimpo.length === 10 || telefoneLimpo.length === 11) {
+          telefoneLimpo = '55' + telefoneLimpo; 
+        }
+      }
+      
+      const response = await fetch('https://callcheck.onrender.com/api/denuncias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          telefone: telefoneLimpo, 
+          empresa: companyInput,
+          tipo: tipoDenuncia, 
+          descricao: descricaoDenuncia
+        })
+      });
 
-    // Buscamos a resposta do servidor (sucesso ou erro)
-    const dadosResposta = await response.json();
+      const dadosResposta = await response.json();
 
-    if (response.ok) {
-      setDenunciaSucesso(true);
-    } else {
-      // AGORA SIM: Exibe a mensagem real que veio do Python/Postgres
-      alert(dadosResposta.mensagem || "Não foi possível registrar a denúncia.");
+      if (response.ok) {
+        setDenunciaSucesso(true);
+      } else {
+        alert(dadosResposta.mensagem || "Não foi possível registrar a denúncia.");
+      }
+    } catch (error) {
+      console.error("Erro ao enviar denúncia:", error);
+      alert("Erro de conexão ao enviar a denúncia.");
+    } finally {
+      setIsSubmittingDenuncia(false);
     }
-  } catch (error) {
-    console.error("Erro ao enviar denúncia:", error);
-    alert("Erro de conexão ao enviar a denúncia.");
-  } finally {
-    setIsSubmittingDenuncia(false);
-  }
-};
+  };
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleValidation(1);
@@ -510,7 +519,7 @@ const handleEnviarDenuncia = async () => {
                             </div>
                           ))}
 
-                          {/* Controles de Paginação (importante para buscas longas por nome que resultam em RISCO) */}
+                          {/* Controles de Paginação */}
                           <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-white/10 w-full">
                             <Button
                               onClick={() => handleValidation(currentPage - 1)}
