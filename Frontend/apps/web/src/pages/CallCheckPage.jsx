@@ -571,9 +571,9 @@ function CallCheckPage() {
                               className="h-12 bg-[#111827] border border-white/10 text-white rounded-xl px-4 text-sm focus:ring-2 focus:ring-red-500/50 outline-none w-full appearance-none"
                             >
                               <option value="">Selecione o tipo...</option>
-                              <option value="GOLPE">Golpe / Fraude</option>
-                              <option value="SPAM">Spam / Assédio Comercial</option>
-                              <option value="FALSO_ATENDIMENTO">Falso Atendimento</option>
+                              <option value="golpe">Golpe / Fraude</option>
+                              <option value="spam">Spam / Assédio Comercial</option>
+                              <option value="falso_atendimento">Falso Atendimento</option>
                             </select>
                             <textarea 
                               value={descricaoDenuncia}
