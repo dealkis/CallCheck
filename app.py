@@ -8,7 +8,7 @@ import os
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "https://callcheck-1.onrender.com"}})
 # =========================
 # CONEXÃO COM POOL DE CONEXÕES
 # =========================
