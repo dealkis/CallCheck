@@ -214,13 +214,47 @@ def api_validar_telefone():
     if not dados:
         return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado"}), 400
         
-    nome = dados.get("nome", "").strip()
-    telefone = dados.get("telefone", "").strip()
-    uf = dados.get("uf", "").strip()
+    # Proteção ativa para garantir que None/null vire string vazia antes do .strip()
+    nome_bruto = dados.get("empresa") or dados.get("nome") or ""
+    nome = str(nome_bruto).strip()
+    
+    telefone_bruto = dados.get("telefone") or ""
+    telefone = str(telefone_bruto).strip()
+    
+    uf_bruto = dados.get("uf") or ""
+    uf = str(uf_bruto).strip()
+    
     pagina = dados.get("pagina", 1)
+    if not isinstance(pagina, int):
+        pagina = 1
 
     # Executa exatamente a sua função interna de banco de dados
     resposta_db = verificar_empresa(nome, telefone, pagina, uf)
+    
+    # Se a busca foi por texto e gerou uma estrutura de LISTA, tratamos para o card único do front-end
+    if resposta_db.get("status") == "LISTA":
+        resultados = resposta_db.get("resultados", [])
+        if resultados:
+            primeiro_registro = resultados[0]
+            lista_tels = primeiro_registro.get("telefones", [])
+            tel_exibir = lista_tels[0] if lista_tels else "Não informado"
+            
+            # Reconstrói os dados de forma compatível com a CallCheckPage.jsx
+            dados_adaptados = {
+                "status": "ENCONTRADO",
+                "empresa": primeiro_registro.get("empresa"),
+                "telefone": tel_exibir,
+                "mensagem": f"✅ Registro encontrado com sucesso!"
+            }
+            return jsonify({"status": "valid", "dados": dados_adaptados})
+        else:
+            return jsonify({
+                "status": "invalid", 
+                "dados": {
+                    "status": "NAO_ENCONTRADO", 
+                    "mensagem": f"❌ Nenhuma empresa encontrada com o termo '{nome}'."
+                }
+            })
     
     # Mapeia as suas respostas estruturadas para o formato simples esperado pela CallCheckPage.jsx
     if resposta_db.get("status") in ["OFICIAL", "ENCONTRADO"]:
