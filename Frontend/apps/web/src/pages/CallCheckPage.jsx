@@ -273,7 +273,7 @@ function CallCheckPage() {
             <div className="flex flex-wrap justify-center gap-[20px]">
               {[
                 { icon: Zap, title: 'Validação em tempo real', desc: 'Verifique instantaneamente se o número está no formato correto.' },
-                { icon: CheckCircle2, title: 'Identificação ativa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
+                { icon: CheckCircle2, title: 'Identificação activa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
                 { icon: Shield, title: 'Detecção de spam', desc: 'Identifique números com formato suspeito ou incompleto.' }
               ].map((item, i) => (
                 <div 
@@ -380,7 +380,7 @@ function CallCheckPage() {
                             </div>
                           ))}
 
-                         {/* Controles de Paginação Sempre Visíveis */}
+                          {/* Controles de Paginação Sempre Visíveis */}
                           <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-white/10 w-full">
                             <Button
                               onClick={() => handleValidation(currentPage - 1)}
@@ -401,23 +401,7 @@ function CallCheckPage() {
                             >
                               Próxima ➡️
                             </Button>
-                          </div> }
-                              
-                              <span className="text-gray-400 text-sm font-medium">
-                                Página {currentPage}
-                              </span>
-
-                              {temProxima && (
-                                <Button
-                                  onClick={() => handleValidation(currentPage + 1)}
-                                  disabled={isValidating}
-                                  className="bg-[#22C55E] hover:bg-[#1fba58] text-white text-sm py-1 px-4 h-9 rounded-lg shadow-md transition-colors"
-                                >
-                                  Próxima ➡️
-                                </Button>
-                              )}
-                            </div>
-                          )}
+                          </div>
                         </div>
                       )}
                     </motion.div>
