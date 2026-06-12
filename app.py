@@ -91,19 +91,23 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             telefone_limpo = limpar_telefone(telefone)
+            
+            # Movido para cima para ser usado no PASSO 1 também (evita falha na verificação de denúncia)
+            tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
 
             # ==============================================================
             # PASSO 1: VERIFICAÇÃO DE DENÚNCIAS (PRIORIDADE MÁXIMA PARA BUSCA POR TEL)
             # ==============================================================
             if telefone_limpo:
                 try:
+                    # Agora verifica o número com e sem o 55
                     cursor.execute("""
                         SELECT d.tipo, d.descricao 
                         FROM denuncia d
                         JOIN telefone t ON d.telefone_id = t.id
-                        WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s 
+                        WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') IN (%s, %s)
                         LIMIT 1
-                    """, (telefone_limpo,))
+                    """, (telefone_limpo, tel_sem_55))
                     denuncia = cursor.fetchone()
                     if denuncia:
                         desc = denuncia.get('descricao')
@@ -120,7 +124,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 except Exception as e:
                     print("Aviso: Falha ao consultar denúncias.", e)
 
-            tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
 
             # ==============================================================
             # CENÁRIO 1: BUSCA POR NOME + TELEFONE
@@ -223,7 +226,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 return {"empresa": None, "telefone": formatar_numero_completo(telefone), "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
             # ==============================================================
-            # CENÁRIO 3: BUSCA APENAS POR NOME (AGORA CHECA DENÚNCIAS TAMBÉM)
+            # CENÁRIO 3: BUSCA APENAS POR NOME
             # ==============================================================
             elif nome:
                 por_pagina = 10
@@ -257,7 +260,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     denuncia_msg = None 
                     
                     if emp['origem'] == 'base_empresa':
-                        # Alterado para checar tipo e descricao
                         cursor.execute("""
                             SELECT t.numero, d.tipo, d.descricao 
                             FROM telefone t
@@ -268,8 +270,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         for row in cursor.fetchall():
                             if row['numero']:
                                 telefones.append(formatar_numero_completo(row['numero']))
-                            # O bug estava aqui: verificar apenas descricao.
-                            # Se a pessoa enviou denuncia sem descricao, ela era ignorada.
                             if row['tipo'] is not None and not denuncia_msg:
                                 desc = row['descricao'] if row['descricao'] else row['tipo']
                                 denuncia_msg = f"Motivo: {desc}"
@@ -281,7 +281,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         "empresa": emp["nome"], 
                         "telefones": telefones, 
                         "uf": uf or "",
-                        "denuncias": denuncia_msg # Passa pro frontend se estiver sujo
+                        "denuncias": denuncia_msg 
                     })
 
                 return {
@@ -301,7 +301,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
 
 # =========================================================================
-# ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT (AJUSTADA)
+# ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT
 # =========================================================================
 @app.route("/api/validar", methods=["POST"])
 def api_validar_telefone():
@@ -326,7 +326,7 @@ def api_validar_telefone():
     resposta_db = verificar_empresa(nome, telefone, pagina, uf)
     
     # =====================================================
-    # SE FOR UMA LISTA (BUSCA POR NOME), VARRE VERIFICANDO RISCOS
+    # SE FOR UMA LISTA (BUSCA POR NOME)
     # =====================================================
     if resposta_db.get("status") == "LISTA":
         resultados = resposta_db.get("resultados", [])
@@ -349,8 +349,6 @@ def api_validar_telefone():
                     "denuncias": denuncia_item
                 })
                 
-            # O "Pulo do Gato": Se achou denúncia em ALGUÉM da lista, a tela inteira fica amarela (risco)
-            # Ajustado para retornar em UPPERCASE e evitar cair na checagem de "invalid" do Front
             status_global = "RISCO" if tem_denuncia_na_lista else "ENCONTRADO"
             msg_global = "⚠️ Atenção: Encontramos registros com alertas vinculados a esta empresa!" if tem_denuncia_na_lista else f"✅ {len(dados_adaptados)} registros encontrados!"
             
@@ -370,7 +368,6 @@ def api_validar_telefone():
                 }
             })
     
-    # Tratamento padrão para busca individual
     if resposta_db.get("status") in ["OFICIAL", "ENCONTRADO"]:
         return jsonify({"status": "valid", "dados": resposta_db})
     elif resposta_db.get("status") == "RISCO":
@@ -416,17 +413,21 @@ def api_registrar_denuncia():
     if not tipo_denuncia:
         return jsonify({"status": "ERRO", "mensagem": "Selecione o motivo da denúncia (Golpe, Spam, etc)."}), 400
 
+    # Blindagem para associar corretamente independentemente de como o front manda
+    tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
+
     with conectar() as conn:
         if not conn:
             return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
         try:
             cursor = conn.cursor()
             
+            # Verifica com e sem o 55 para achar o telefone base
             cursor.execute("""
                 SELECT id FROM telefone 
-                WHERE REGEXP_REPLACE(numero, '\D', '', 'g') = %s 
+                WHERE REGEXP_REPLACE(numero, '\D', '', 'g') IN (%s, %s)
                 LIMIT 1
-            """, (telefone_limpo,))
+            """, (telefone_limpo, tel_sem_55))
             tel_row = cursor.fetchone()
             
             if tel_row:
@@ -647,7 +648,6 @@ def database_view():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
 '''
  _____  ______     _     _       __ __ ______ ______ 
 |  __ \|  ____|   /\    | |     | |/ /|_   _|/ ____|
