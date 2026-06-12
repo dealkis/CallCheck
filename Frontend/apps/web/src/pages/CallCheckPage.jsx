@@ -140,7 +140,7 @@ function CallCheckPage() {
 
       if (statusRetornado === 'OFICIAL' || statusRetornado === 'ENCONTRADO' || statusRetornado === 'valid') {
         setValidationResult('valid');
-      } else if (statusRetornado === 'RISCO' || statusRetornado === 'DENUNCIADO') {
+      } else if (statusRetornado === 'RISCO' || statusRetornado === 'DENUNCIADO' || statusRetornado === 'risco') {
         setValidationResult('risco'); 
       } else {
         setValidationResult('invalid'); 
@@ -484,19 +484,54 @@ const handleEnviarDenuncia = async () => {
                       {dadosCompletos && (
                         <div className="mt-2 pl-9 w-full flex flex-col gap-3">
                           {(Array.isArray(dadosCompletos) ? dadosCompletos : [dadosCompletos]).map((item, index) => (
-                            <div key={index} className="text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#F59E0B]/20">
+                            <div key={index} className={`text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border ${item.denuncias ? 'border-[#F59E0B]/50' : 'border-[#22C55E]/20'}`}>
                               {(item.empresa || item.nome_empresa) && (
                                 <div className="flex items-center gap-2 text-white font-medium">
-                                  <Building2 className="w-4 h-4 text-[#F59E0B]" />
+                                  <Building2 className={`w-4 h-4 ${item.denuncias ? 'text-[#F59E0B]' : 'text-[#22C55E]'}`} />
                                   <span>Suposta Empresa: {item.empresa || item.nome_empresa}</span>
                                 </div>
                               )}
-                              <div className="flex items-center gap-2 text-sm text-red-400 font-semibold bg-red-500/10 p-2 rounded border border-red-500/20 mt-1">
-                                <MessageSquareWarning className="w-4 h-4" />
-                                <span>Status: {item.denuncias || "Este canal possui denúncias ou atividades não autorizadas."}</span>
+                              <div className="text-sm text-gray-400 flex items-center gap-1.5 mt-1">
+                                <Phone className="w-3.5 h-3.5 text-gray-500" />
+                                <span>Telefone Vinculado: {item.telefone || phoneInput || "Não informado"}</span>
                               </div>
+                              
+                              {item.denuncias ? (
+                                <div className="flex items-center gap-2 text-sm text-red-400 font-semibold bg-red-500/10 p-2 rounded border border-red-500/20 mt-2">
+                                  <MessageSquareWarning className="w-4 h-4 flex-shrink-0" />
+                                  <span>Status: {item.denuncias}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm text-[#22C55E] font-medium mt-2">
+                                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                                  <span>Canal sem alertas</span>
+                                </div>
+                              )}
                             </div>
                           ))}
+
+                          {/* Controles de Paginação (importante para buscas longas por nome que resultam em RISCO) */}
+                          <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-white/10 w-full">
+                            <Button
+                              onClick={() => handleValidation(currentPage - 1)}
+                              disabled={isValidating || currentPage <= 1}
+                              className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm py-1 px-4 h-9 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              ⬅️ Anterior
+                            </Button>
+                            
+                            <span className="text-gray-400 text-sm font-medium">
+                              Página {currentPage}
+                            </span>
+
+                            <Button
+                              onClick={() => handleValidation(currentPage + 1)}
+                              disabled={isValidating || !temProxima}
+                              className="bg-[#22C55E] hover:bg-[#1fba58] text-white text-sm py-1 px-4 h-9 rounded-lg shadow-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              Próxima ➡️
+                            </Button>
+                          </div>
                         </div>
                       )}
                       
@@ -589,9 +624,9 @@ const handleEnviarDenuncia = async () => {
                               className="h-12 bg-[#111827] border border-white/10 text-white rounded-xl px-4 text-sm focus:ring-2 focus:ring-red-500/50 outline-none w-full appearance-none"
                             >
                               <option value="">Selecione o tipo de ocorrência...</option>
-                              <option value="golpe">Golpe / Fraude</option>
-                              <option value="spam">Spam / Assédio Comercial</option>
-                              <option value="falso_atendimento">Falso Atendimento</option>
+                              <option value="GOLPE">Golpe / Fraude</option>
+                              <option value="SPAM">Spam / Assédio Comercial</option>
+                              <option value="FALSO_ATENDIMENTO">Falso Atendimento</option>
                             </select>
                             <textarea 
                               value={descricaoDenuncia}
