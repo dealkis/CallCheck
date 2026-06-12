@@ -368,7 +368,7 @@ def index():
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
 # =========================================================================
-# NOVA ROTA PARA RECEBER DENÚNCIAS DO FRONTEND EM REACT
+# ROTA DE DENÚNCIAS CORRIGIDA E BLINDADA PARA O REACT
 # =========================================================================
 @app.route("/api/denuncias", methods=["POST"])
 def api_registrar_denuncia():
@@ -378,13 +378,17 @@ def api_registrar_denuncia():
         return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado"}), 400
         
     telefone_bruto = dados.get("telefone", "")
-    tipo = dados.get("tipo", "") # Ex: GOLPE, SPAM, FALSO_ATENDIMENTO
+    tipo_vinda = dados.get("tipo", "")
     descricao = dados.get("descricao", "")
     
     telefone_limpo = limpar_telefone(telefone_bruto)
     
-    if not telefone_limpo or not tipo:
-        return jsonify({"status": "ERRO", "mensagem": "Telefone e tipo de ocorrência são obrigatórios"}), 400
+    if not telefone_limpo:
+        return jsonify({"status": "ERRO", "mensagem": "Telefone é obrigatório"}), 400
+
+    # Força o tipo a ficar em maiúsculo caso seu ENUM use padrão 'SPAM', 'GOLPE'
+    # Se o frontend não mandar nada, ele tenta usar 'SPAM' como fallback temporário
+    tipo_formatado = str(tipo_vinda).strip().upper() if tipo_vinda else "SPAM"
 
     with conectar() as conn:
         if not conn:
@@ -403,7 +407,7 @@ def api_registrar_denuncia():
             if tel_row:
                 telefone_id = tel_row[0]
             else:
-                # 2. Se não existir, insere como desconhecido e suspeito
+                # 2. Se o número não existir (caso da sua dúvida), insere na tabela telefone primeiro
                 cursor.execute("""
                     INSERT INTO telefone (numero, tipo, suspeito, principal) 
                     VALUES (%s, 'desconhecido', true, false) 
@@ -411,25 +415,30 @@ def api_registrar_denuncia():
                 """, (telefone_bruto,)) 
                 telefone_id = cursor.fetchone()[0]
             
-            # 3. Insere a denúncia vinculada a esse telefone
-            # (usuario_id vai nulo por enquanto, já que é uma denúncia pública)
+            # 3. Insere a denúncia vinculada ao ID do telefone
             cursor.execute("""
                 INSERT INTO denuncia (telefone_id, tipo, descricao) 
                 VALUES (%s, %s, %s)
-            """, (telefone_id, tipo, descricao))
+            """, (telefone_id, tipo_formatado, descricao))
             
             conn.commit()
-            return jsonify({"status": "SUCESSO", "mensagem": "Denúncia registrada no banco com sucesso!"}), 200
+            return jsonify({"status": "SUCESSO", "mensagem": "Denúncia registrada com sucesso!"}), 200
             
+        except psycopg2.errors.InvalidTextRepresentation as e:
+            conn.rollback()
+            print(f"Erro de ENUM no Postgres: {e}")
+            return jsonify({
+                "status": "ERRO", 
+                "mensagem": f"O tipo de denúncia '{tipo_formatado}' não é aceito pelo banco. Verifique as opções do ENUM tipo_denuncia."
+            }), 400
         except psycopg2.IntegrityError as e:
             conn.rollback()
-            # Pode cair aqui se a constraint 'unica_denuncia_por_usuario' barrar (mesmo usuário denunciando mesmo número)
-            return jsonify({"status": "ERRO", "mensagem": "Denúncia já registrada para este número."}), 409
+            return jsonify({"status": "ERRO", "mensagem": "Você ou outro usuário já cadastrou uma denúncia idêntica para este número recentemente."}), 409
         except Exception as e:
             conn.rollback()
-            print("Erro detalhado ao salvar denúncia via API:", e)
-            return jsonify({"status": "ERRO", "mensagem": "Erro interno ao salvar no banco."}), 500
-
+            print("Erro geral ao salvar denúncia:", e)
+            return jsonify({"status": "ERRO", "mensagem": "Não foi possível registrar a denúncia no momento."}), 500
+            
 @app.route("/sobre")
 def sobre():
     return render_template("sobre.html")
