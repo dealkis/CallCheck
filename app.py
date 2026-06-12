@@ -171,19 +171,19 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 termo_busca = f"%{nome}%"
                 
                 cursor.execute("""
-                    SELECT id, nome, verificada, 'base_empresa' AS origem
+                    SELECT id, nome, verificada, 'base_empresa' AS origem, CAST(NULL AS VARCHAR) AS telefone
                     FROM empresa
                     WHERE nome ILIKE %s
                     
                     UNION ALL
                     
-                    SELECT id, nome, false AS verificada, 'receita' AS origem
+                    SELECT id, nome, false AS verificada, 'receita' AS origem, CAST(telefone_receita AS VARCHAR) AS telefone
                     FROM empresa_receita
-                    WHERE nome ILIKE %s
+                    WHERE nome ILIKE %s OR telefone_receita ILIKE %s
                     
                     ORDER BY nome ASC 
                     LIMIT %s OFFSET %s
-                """, (termo_busca, termo_busca, por_pagina + 1, offset))
+                """, (termo_busca, termo_busca, termo_busca, por_pagina + 1, offset))
                 
                 empresas = cursor.fetchall()
                 tem_proxima = len(empresas) > por_pagina
@@ -194,7 +194,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (emp['id'],))
                         telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall()]
                     else:
-                        telefones = [] # Registros da Receita Federal geralmente não possuem telefone vinculado nesta estrutura de BD
+                        telefones = [formatar_numero_completo(emp['telefone'])] if emp.get('telefone') else []
                     
                     lista_resultados.append({
                         "empresa": emp["nome"], 
