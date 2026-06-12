@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, Phone, TrendingDown, Shield, Zap, DollarSign, Users, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Phone, TrendingDown, Shield, Zap, DollarSign, Users, Clock, AlertTriangle, Building2, MessageSquareWarning } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -57,14 +57,16 @@ function CallCheckPage() {
   const [phoneInput, setPhoneInput] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
-  const [mensagemBackend, setMensagemBackend] = useState(''); // <-- Estado para ler a resposta do Python
+  const [mensagemBackend, setMensagemBackend] = useState(''); 
+  const [dadosCompletos, setDadosCompletos] = useState(null); // <-- Novo estado para guardar o objeto completo do Python (empresa, telefone, denuncias, etc.)
 
   const handleValidation = async () => {
     if (!phoneInput) return;
     
     setIsValidating(true);
     setValidationResult(null);
-    setMensagemBackend(''); // Limpa mensagens anteriores
+    setMensagemBackend(''); 
+    setDadosCompletos(null); // Limpa os dados anteriores
 
     try {
       // Chama a sua API Flask hospedada no Render
@@ -79,20 +81,23 @@ function CallCheckPage() {
 
       const dados = await response.json();
       
-      // Guarda a mensagem que veio do seu banco de dados
-      // Suporta tanto o formato direto quanto o formato aninhado (dados.dados)
-      const mensagemRetornada = dados.mensagem || (dados.dados && dados.dados.mensagem) || '';
+      // Guarda o objeto de dados que veio de dentro da resposta do Python
+      // Se o seu python retorna tudo no objeto principal ou dentro de dados.dados, pegamos aqui:
+      const dadosDoObjeto = dados.dados || dados;
+      setDadosCompletos(dadosDoObjeto);
+
+      const mensagemRetornada = dados.mensagem || dadosDoObjeto.mensagem || '';
       setMensagemBackend(mensagemRetornada);
 
       // Define a cor/ícone baseado no status que o seu Python retornou
-      const statusRetornado = dados.status || (dados.dados && dados.dados.status);
+      const statusRetornado = dados.status || dadosDoObjeto.status;
 
       if (statusRetornado === 'OFICIAL' || statusRetornado === 'ENCONTRADO' || statusRetornado === 'valid') {
         setValidationResult('valid');
-      } else if (statusRetornado === 'RISCO' || (dados.dados && dados.dados.status === 'RISCO')) {
-        setValidationResult('risco'); // Novo status para números denunciados
+      } else if (statusRetornado === 'RISCO' || statusRetornado === 'DENUNCIADO') {
+        setValidationResult('risco'); 
       } else {
-        setValidationResult('invalid'); // NAO_OFICIAL, NAO_ENCONTRADO ou ERRO
+        setValidationResult('invalid'); 
       }
 
     } catch (error) {
@@ -325,30 +330,65 @@ function CallCheckPage() {
                       variants={resultVariants}
                       initial="hidden"
                       animate="show"
-                      className="flex items-center gap-3 text-[#22C55E]"
+                      className="flex flex-col items-start gap-2 text-[#22C55E] w-full text-left p-2"
                     >
-                      <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
-                      <span className="text-lg font-medium">{mensagemBackend || "✅ Número válido"}</span>
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
+                        <span className="text-lg font-bold">{mensagemBackend || "✅ Número Oficial Encontrado"}</span>
+                      </div>
+                      {/* Exibe os dados extras retornados pelo Python se existirem */}
+                      {dadosCompletos && (dadosCompletos.empresa || dadosCompletos.nome_empresa) && (
+                        <div className="mt-2 pl-9 text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#22C55E]/20">
+                          <div className="flex items-center gap-2 text-white font-medium">
+                            <Building2 className="w-4 h-4 text-[#22C55E]" />
+                            <span>Empresa: {dadosCompletos.empresa || dadosCompletos.nome_empresa}</span>
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            Telefone Oficial: {dadosCompletos.telefone || phoneInput}
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   ) : validationResult === 'risco' ? (
                     <motion.div 
                       variants={resultVariants}
                       initial="hidden"
                       animate="show"
-                      className="flex items-center gap-3 text-[#F59E0B]"
+                      className="flex flex-col items-start gap-2 text-[#F59E0B] w-full text-left p-2"
                     >
-                      <AlertTriangle className="w-6 h-6 flex-shrink-0" />
-                      <span className="text-lg font-medium">{mensagemBackend}</span>
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+                        <span className="text-lg font-bold">{mensagemBackend || "⚠️ Atenção: Número com Alertas"}</span>
+                      </div>
+                      {dadosCompletos && (
+                        <div className="mt-2 pl-9 text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#F59E0B]/20">
+                          {dadosCompletos.empresa && (
+                            <div className="flex items-center gap-2 text-white font-medium">
+                              <Building2 className="w-4 h-4 text-[#F59E0B]" />
+                              <span>Suposta Empresa: {dadosCompletos.empresa}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-sm text-red-400 font-semibold bg-red-500/10 p-2 rounded border border-red-500/20 mt-1">
+                            <MessageSquareWarning className="w-4 h-4" />
+                            <span>Status: {dadosCompletos.denuncias || "Este número possui registros de atividade suspeita ou denúncias."}</span>
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   ) : validationResult === 'invalid' ? (
                     <motion.div 
                       variants={resultVariants}
                       initial="hidden"
                       animate="show"
-                      className="flex items-center gap-3 text-[#EF4444]"
+                      className="flex flex-col items-start gap-2 text-[#EF4444] w-full text-left p-2"
                     >
-                      <XCircle className="w-6 h-6 flex-shrink-0" />
-                      <span className="text-lg font-medium">{mensagemBackend || "❌ Número inválido"}</span>
+                      <div className="flex items-center gap-3">
+                        <XCircle className="w-6 h-6 flex-shrink-0" />
+                        <span className="text-lg font-bold">{mensagemBackend || "❌ Número Não Oficial / Inválido"}</span>
+                      </div>
+                      <div className="mt-1 pl-9 text-sm text-gray-400">
+                        Este número não está cadastrado em canais oficiais conhecidos ou falhou nos critérios de validação.
+                      </div>
                     </motion.div>
                   ) : (
                     <span className="text-gray-500 text-sm transition-opacity duration-300">O resultado da validação aparecerá aqui</span>
@@ -379,7 +419,7 @@ function CallCheckPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
-                { icon: DollarSign, title: 'Redução de custos', desc: 'Economize recursos eliminando contatos inválidos antes de investir tempo neles.' },
+                { icon: DollarSign, title: 'Redução de custos', desc: 'Economize resources eliminando contatos inválidos antes de investir tempo neles.' },
                 { icon: Users, title: 'Mais contatos reais', desc: 'Foque apenas em números válidos e aumente sua taxa de conversão significativamente.' },
                 { icon: Zap, title: 'Resultado instantâneo', desc: 'Validação em tempo real sem espera ou processamento demorado em lote.' }
               ].map((item, i) => (
