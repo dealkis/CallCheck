@@ -167,9 +167,9 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     return {
                         "empresa": resultado["empresa_nome"],
                         "telefone": formatar_numero_completo(resultado["numero"]),
-                        "status": "OFICIAL",  # <--- Mudado para sempre mandar OFICIAL
+                        "status": "OFICIAL",
                         "uf": uf or "",
-                        "mensagem": mensaje_final
+                        "mensagem": mensagem_final  # <--- Corrigido aqui (estava mensaje_final)
                     }
                 else:
                     return {
