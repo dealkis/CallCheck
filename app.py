@@ -375,28 +375,25 @@ def api_registrar_denuncia():
     dados = request.get_json()
     
     if not dados:
-        return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado"}), 400
+        return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado do formulário."}), 400
         
-    telefone_bruto = dados.get("telefone", "")
-    tipo_vinda = dados.get("tipo", "")
-    descricao = dados.get("descricao", "")
-    
-    telefone_limpo = limpar_telefone(telefone_bruto)
+    telefone_limpo = dados.get("telefone", "").strip()
+    tipo_denuncia = dados.get("tipo", "").strip()
+    descricao = dados.get("descricao", "").strip()
     
     if not telefone_limpo:
-        return jsonify({"status": "ERRO", "mensagem": "Telefone é obrigatório"}), 400
-
-    # Força o tipo a ficar em maiúsculo caso seu ENUM use padrão 'SPAM', 'GOLPE'
-    # Se o frontend não mandar nada, ele tenta usar 'SPAM' como fallback temporário
-    tipo_formatado = str(tipo_vinda).strip().upper() if tipo_vinda else "SPAM"
+        return jsonify({"status": "ERRO", "mensagem": "O número de telefone não foi informado ou é inválido."}), 400
+        
+    if not tipo_denuncia:
+        return jsonify({"status": "ERRO", "mensagem": "Selecione o motivo da denúncia (Golpe, Spam, etc)."}), 400
 
     with conectar() as conn:
         if not conn:
-            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão ao banco de dados"}), 500
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
         try:
             cursor = conn.cursor()
             
-            # 1. Verifica se o telefone já existe na base
+            # 1. Verifica se o número já existe na tabela 'telefone'
             cursor.execute("""
                 SELECT id FROM telefone 
                 WHERE REGEXP_REPLACE(numero, '\D', '', 'g') = %s 
@@ -407,37 +404,47 @@ def api_registrar_denuncia():
             if tel_row:
                 telefone_id = tel_row[0]
             else:
-                # 2. Se o número não existir (caso da sua dúvida), insere na tabela telefone primeiro
+                # 2. Se não existir, insere na tabela telefone primeiro
+                # ATENÇÃO: Se der erro aqui, o ENUM da tabela telefone pode ser diferente de 'desconhecido'
                 cursor.execute("""
                     INSERT INTO telefone (numero, tipo, suspeito, principal) 
                     VALUES (%s, 'desconhecido', true, false) 
                     RETURNING id
-                """, (telefone_bruto,)) 
+                """, (telefone_limpo,)) 
                 telefone_id = cursor.fetchone()[0]
             
-            # 3. Insere a denúncia vinculada ao ID do telefone
+            # 3. Insere o registro na tabela denuncia com as chaves exatas do banco
             cursor.execute("""
                 INSERT INTO denuncia (telefone_id, tipo, descricao) 
                 VALUES (%s, %s, %s)
-            """, (telefone_id, tipo_formatado, descricao))
+            """, (telefone_id, tipo_denuncia, descricao))
             
             conn.commit()
-            return jsonify({"status": "SUCESSO", "mensagem": "Denúncia registrada com sucesso!"}), 200
+            return jsonify({"status": "SUCESSO", "mensagem": "✅ Denúncia registrada com sucesso!"}), 200
             
         except psycopg2.errors.InvalidTextRepresentation as e:
-            conn.rollback()
-            print(f"Erro de ENUM no Postgres: {e}")
+            if conn: conn.rollback()
+            print("Erro de ENUM detectado:", str(e))
             return jsonify({
                 "status": "ERRO", 
-                "mensagem": f"O tipo de denúncia '{tipo_formatado}' não é aceito pelo banco. Verifique as opções do ENUM tipo_denuncia."
+                "mensagem": f"O banco recusou o valor enviado. Verifique se os ENUMs estão certos no Postgres. Erro: {str(e)}"
             }), 400
+            
         except psycopg2.IntegrityError as e:
-            conn.rollback()
-            return jsonify({"status": "ERRO", "mensagem": "Você ou outro usuário já cadastrou uma denúncia idêntica para este número recentemente."}), 409
+            if conn: conn.rollback()
+            print("Erro de restrição/duplicidade:", str(e))
+            return jsonify({
+                "status": "ERRO", 
+                "mensagem": "Este número já possui uma denúncia registrada por você ou viola regras de integridade."
+            }), 409
+            
         except Exception as e:
-            conn.rollback()
-            print("Erro geral ao salvar denúncia:", e)
-            return jsonify({"status": "ERRO", "mensagem": "Não foi possível registrar a denúncia no momento."}), 500
+            if conn: conn.rollback()
+            print("Erro geral no salvamento da denúncia:", str(e))
+            return jsonify({
+                "status": "ERRO", 
+                "mensagem": f"Falha interna no banco de dados: {str(e)}"
+            }), 500
             
 @app.route("/sobre")
 def sobre():
