@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, Phone, TrendingDown, Shield, Zap, DollarSign, Users, Clock, AlertTriangle, Building2, MessageSquareWarning } from 'lucide-react';
+import { CheckCircle2, XCircle, Phone, TrendingDown, Shield, Zap, DollarSign, Users, Clock, AlertTriangle, Building2, MessageSquareWarning, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -55,41 +55,45 @@ const RippleButton = ({ children, className, onClick, ...props }) => {
 
 function CallCheckPage() {
   const [phoneInput, setPhoneInput] = useState('');
+  const [companyInput, setCompanyInput] = useState(''); // <-- Novo estado para o input da empresa
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
   const [mensagemBackend, setMensagemBackend] = useState(''); 
   const [dadosCompletos, setDadosCompletos] = useState(null); 
 
   const handleValidation = async () => {
-    if (!phoneInput) return;
+    // Só prossegue se pelo menos um dos campos estiver preenchido
+    if (!phoneInput && !companyInput) return;
     
     setIsValidating(true);
     setValidationResult(null);
     setMensagemBackend(''); 
     setDadosCompletos(null); 
 
-    // --- QUALIDADE DE VIDA: Normalização do número antes do envio ---
-    // Remove qualquer caractere que não seja número (garante apenas dígitos)
-    let telefoneLimpo = phoneInput.replace(/\D/g, '');
+    // --- Normalização do número se ele foi digitado ---
+    let telefoneLimpo = '';
+    if (phoneInput) {
+      telefoneLimpo = phoneInput.replace(/\D/g, '');
 
-    // Se o usuário digitou apenas o número fixo ou celular sem DDD (8 ou 9 dígitos)
-    if (telefoneLimpo.length === 8 || telefoneLimpo.length === 9) {
-      telefoneLimpo = '5511' + telefoneLimpo; // Completa com o DDI 55 + DDD 11 padrão
-    } 
-    // Se o usuário digitou o número com DDD mas sem o 55 do país (10 ou 11 dígitos)
-    else if (telefoneLimpo.length === 10 || telefoneLimpo.length === 11) {
-      telefoneLimpo = '55' + telefoneLimpo; // Completa apenas com o DDI 55
+      if (telefoneLimpo.length === 8 || telefoneLimpo.length === 9) {
+        telefoneLimpo = '5511' + telefoneLimpo; 
+      } 
+      else if (telefoneLimpo.length === 10 || telefoneLimpo.length === 11) {
+        telefoneLimpo = '55' + telefoneLimpo; 
+      }
     }
-    // -----------------------------------------------------------------
 
     try {
-      // Chama a sua API Flask hospedada no Render enviando o número já tratado
+      // Chama a sua API Flask enviando os dois campos estruturados
       const response = await fetch('https://callcheck.onrender.com/api/validar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ telefone: telefoneLimpo }) 
+        body: JSON.stringify({ 
+          telefone: telefoneLimpo || null, 
+          empresa: companyInput.trim() || null 
+        }) 
       });
 
       const dados = await response.json();
@@ -126,7 +130,6 @@ function CallCheckPage() {
   };
 
   const handleInputChange = (e) => {
-    // Permite que o usuário digite livremente números e caracteres comuns de formatação
     const value = e.target.value.replace(/[^\d\s()+-]/g, '');
     setPhoneInput(value);
   };
@@ -162,8 +165,8 @@ function CallCheckPage() {
   return (
     <>
       <Helmet>
-        <title>CallCheck - Validação de números telefônicos</title>
-        <meta name="description" content="Valide números telefônicos com precisão e elimine contatos inválidos da sua base de dados" />
+        <title>CallCheck - Validação de canais corporativos</title>
+        <meta name="description" content="Valide números telefônicos e empresas com precisão e elimine fraudes da sua base." />
       </Helmet>
 
       <div className="min-h-screen text-white selection:bg-[#22C55E]/30">
@@ -187,7 +190,7 @@ function CallCheckPage() {
               className="text-xl md:text-2xl mb-10 text-gray-300 leading-relaxed max-w-2xl mx-auto font-medium"
               variants={itemVariants}
             >
-              Valide números telefônicos com precisão e elimine contatos inválidos da sua base.
+              Valide números telefônicos ou empresas com precisão e elimine contatos falsos da sua base.
             </motion.p>
 
             <motion.div 
@@ -299,42 +302,59 @@ function CallCheckPage() {
           >
             <div className="text-center mb-10">
               <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold mb-4">
-                Teste a Validação
+                Painel de Consulta
               </motion.h2>
               <motion.p variants={itemVariants} className="text-gray-400 text-lg">
-                Digite um número de telefone abaixo para ver o sistema em ação.
+                Pesquise por Telefone, Nome da Empresa ou use ambos os filtros.
               </motion.p>
             </div>
 
             <motion.div variants={itemVariants}>
               <Card className="p-8 bg-[#111827] border-white/10 shadow-2xl">
-                <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                  <div className="flex-1">
+                {/* Inputs empilhados verticalmente */}
+                <div className="flex flex-col gap-4 mb-8">
+                  <div className="relative">
                     <Input
                       type="tel"
-                      placeholder="Ex: (11) 4979-3300"
+                      placeholder="Pesquisar por Telefone (Ex: 11 4979-3300)"
                       value={phoneInput}
                       onChange={handleInputChange}
                       onKeyPress={handleKeyPress}
                       disabled={isValidating}
-                      className="h-14 text-lg bg-black/40 border-white/10 text-white placeholder:text-gray-500 transition-all duration-300 ease-in-out focus:scale-[1.02] focus:ring-2 focus:ring-[#22C55E]/50 focus:border-[#22C55E] focus:shadow-[0_0_15px_rgba(34,197,94,0.3)] rounded-xl"
+                      className="h-14 text-lg bg-black/40 border-white/10 text-white placeholder:text-gray-500 transition-all duration-300 ease-in-out focus:scale-[1.01] focus:ring-2 focus:ring-[#22C55E]/50 focus:border-[#22C55E] focus:shadow-[0_0_15px_rgba(34,197,94,0.3)] rounded-xl pl-12"
                     />
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                   </div>
+
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Pesquisar por Nome da Empresa (Ex: Google Brasil)"
+                      value={companyInput}
+                      onChange={(e) => setCompanyInput(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      disabled={isValidating}
+                      className="h-14 text-lg bg-black/40 border-white/10 text-white placeholder:text-gray-500 transition-all duration-300 ease-in-out focus:scale-[1.01] focus:ring-2 focus:ring-[#22C55E]/50 focus:border-[#22C55E] focus:shadow-[0_0_15px_rgba(34,197,94,0.3)] rounded-xl pl-12"
+                    />
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  </div>
+
                   <RippleButton 
                     onClick={handleValidation}
-                    disabled={isValidating || !phoneInput}
-                    className="bg-[#22C55E] hover:bg-[#22C55E] text-white font-semibold h-14 px-8 rounded-xl hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none"
+                    disabled={isValidating || (!phoneInput && !companyInput)}
+                    className="bg-[#22C55E] hover:bg-[#22C55E] text-white font-semibold h-14 rounded-xl hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none mt-2 flex items-center justify-center text-lg w-full"
                   >
-                    <Phone className="w-5 h-5 mr-2" />
-                    Validar
+                    <Search className="w-5 h-5 mr-2" />
+                    Pesquisar Registro
                   </RippleButton>
                 </div>
 
-                <div className="min-h-[80px] flex items-center justify-center rounded-xl bg-black/20 border border-white/5 p-4 overflow-hidden">
+                {/* Bloco de Resposta dos Resultados */}
+                <div className="min-h-[80px] flex items-center justify-center rounded-xl bg-black/20 border border border-white/5 p-4 overflow-hidden">
                   {isValidating ? (
                     <div className="flex items-center gap-3 text-[#2563EB] animate-custom-pulse">
                       <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                      <span className="text-lg font-medium">⏳ Validando...</span>
+                      <span className="text-lg font-medium">⏳ Consultando base de dados...</span>
                     </div>
                   ) : validationResult === 'valid' ? (
                     <motion.div 
@@ -345,17 +365,17 @@ function CallCheckPage() {
                     >
                       <div className="flex items-center gap-3">
                         <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
-                        <span className="text-lg font-bold">{mensagemBackend || "✅ Número Oficial Encontrado"}</span>
+                        <span className="text-lg font-bold">{mensagemBackend || "✅ Canal Oficial Identificado"}</span>
                       </div>
-                      {/* Exibe os dados extras retornados pelo Python se existirem */}
-                      {dadosCompletos && (dadosCompletos.empresa || dadosCompletos.nome_empresa) && (
+                      {dadosCompletos && (
                         <div className="mt-2 pl-9 text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#22C55E]/20">
                           <div className="flex items-center gap-2 text-white font-medium">
                             <Building2 className="w-4 h-4 text-[#22C55E]" />
-                            <span>Empresa: {dadosCompletos.empresa || dadosCompletos.nome_empresa}</span>
+                            <span>Empresa: {dadosCompletos.empresa || dadosCompletos.nome_empresa || "Nome indisponível"}</span>
                           </div>
-                          <div className="text-sm text-gray-400">
-                            Telefone Oficial: {dadosCompletos.telefone || phoneInput}
+                          <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-gray-500" />
+                            <span>Telefone Vinculado: {dadosCompletos.telefone || phoneInput || "Não informado"}</span>
                           </div>
                         </div>
                       )}
@@ -369,19 +389,19 @@ function CallCheckPage() {
                     >
                       <div className="flex items-center gap-3">
                         <AlertTriangle className="w-6 h-6 flex-shrink-0" />
-                        <span className="text-lg font-bold">{mensagemBackend || "⚠️ Atenção: Número com Alertas"}</span>
+                        <span className="text-lg font-bold">{mensagemBackend || "⚠️ Atenção: Registros com Alertas"}</span>
                       </div>
                       {dadosCompletos && (
                         <div className="mt-2 pl-9 text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#F59E0B]/20">
-                          {dadosCompletos.empresa && (
+                          {(dadosCompletos.empresa || dadosCompletos.nome_empresa) && (
                             <div className="flex items-center gap-2 text-white font-medium">
                               <Building2 className="w-4 h-4 text-[#F59E0B]" />
-                              <span>Suposta Empresa: {dadosCompletos.empresa}</span>
+                              <span>Suposta Empresa: {dadosCompletos.empresa || dadosCompletos.nome_empresa}</span>
                             </div>
                           )}
                           <div className="flex items-center gap-2 text-sm text-red-400 font-semibold bg-red-500/10 p-2 rounded border border-red-500/20 mt-1">
                             <MessageSquareWarning className="w-4 h-4" />
-                            <span>Status: {dadosCompletos.denuncias || "Este número possui registros de atividade suspeita ou denúncias."}</span>
+                            <span>Status: {dadosCompletos.denuncias || "Este canal possui denúncias ou atividades não autorizadas."}</span>
                           </div>
                         </div>
                       )}
@@ -395,14 +415,14 @@ function CallCheckPage() {
                     >
                       <div className="flex items-center gap-3">
                         <XCircle className="w-6 h-6 flex-shrink-0" />
-                        <span className="text-lg font-bold">{mensagemBackend || "❌ Número Não Oficial / Inválido"}</span>
+                        <span className="text-lg font-bold">{mensagemBackend || "❌ Não Encontrado / Fora dos Padrões"}</span>
                       </div>
                       <div className="mt-1 pl-9 text-sm text-gray-400">
-                        Este número não está cadastrado em canais oficiais conhecidos ou falhou nos critérios de validação.
+                        O termo ou telefone pesquisado não consta nos registros oficiais cadastrados ou falhou na checagem.
                       </div>
                     </motion.div>
                   ) : (
-                    <span className="text-gray-500 text-sm transition-opacity duration-300">O resultado da validação aparecerá aqui</span>
+                    <span className="text-gray-500 text-sm transition-opacity duration-300">O resultado da busca detalhada aparecerá aqui</span>
                   )}
                 </div>
               </Card>
