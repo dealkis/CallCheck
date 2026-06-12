@@ -34,7 +34,7 @@ const RippleButton = ({ children, className, onClick, ...props }) => {
       ref={buttonRef}
       onClick={handleClick}
       className={`ripple-container relative overflow-hidden transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 ${className}`}
-      ...props}
+      {...props}
     >
       {children}
       {ripples.map((ripple) => (
