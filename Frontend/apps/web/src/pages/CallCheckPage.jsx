@@ -155,41 +155,43 @@ function CallCheckPage() {
     }
   };
 
-  // === NOVA FUNÇÃO: ENVIAR DENÚNCIA ===
-  const handleEnviarDenuncia = async () => {
-    if (!tipoDenuncia) return;
-    setIsSubmittingDenuncia(true);
+ // === FUNÇÃO CORRIGIDA NO JSX ===
+const handleEnviarDenuncia = async () => {
+  if (!tipoDenuncia) return;
+  setIsSubmittingDenuncia(true);
 
-    try {
-      let telefoneLimpo = phoneInput ? phoneInput.replace(/\D/g, '') : '';
-      
-      const response = await fetch('https://callcheck.onrender.com/api/denuncias', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          telefone: telefoneLimpo, 
-          empresa: companyInput,
-          tipo: tipoDenuncia, // ENUM: GOLPE, SPAM, FALSO_ATENDIMENTO
-          descricao: descricaoDenuncia
-        })
-      });
+  try {
+    let telefoneLimpo = phoneInput ? phoneInput.replace(/\D/g, '') : '';
+    
+    const response = await fetch('https://callcheck.onrender.com/api/denuncias', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        telefone: telefoneLimpo, 
+        empresa: companyInput,
+        tipo: tipoDenuncia, // Envia GOLPE, SPAM, FALSO_ATENDIMENTO
+        descricao: descricaoDenuncia
+      })
+    });
 
-      if (response.ok) {
-        setDenunciaSucesso(true);
-      } else {
-        // Tratar erro do banco ou de FK
-        alert("Não foi possível registrar a denúncia no momento. Verifique os dados.");
-      }
-    } catch (error) {
-      console.error("Erro ao enviar denúncia:", error);
-      alert("Erro de conexão ao enviar a denúncia.");
-    } finally {
-      setIsSubmittingDenuncia(false);
+    // Buscamos a resposta do servidor (sucesso ou erro)
+    const dadosResposta = await response.json();
+
+    if (response.ok) {
+      setDenunciaSucesso(true);
+    } else {
+      // AGORA SIM: Exibe a mensagem real que veio do Python/Postgres
+      alert(dadosResposta.mensagem || "Não foi possível registrar a denúncia.");
     }
-  };
-
+  } catch (error) {
+    console.error("Erro ao enviar denúncia:", error);
+    alert("Erro de conexão ao enviar a denúncia.");
+  } finally {
+    setIsSubmittingDenuncia(false);
+  }
+};
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleValidation(1);
