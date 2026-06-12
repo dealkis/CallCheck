@@ -1,7 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, Phone, TrendingDown, Shield, Zap, DollarSign, Users, Clock, AlertTriangle, Building2, MessageSquareWarning, Search } from 'lucide-react';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Phone, 
+  TrendingDown, 
+  Shield, 
+  Zap, 
+  DollarSign, 
+  Users, 
+  Clock, 
+  AlertTriangle, 
+  Building2, 
+  MessageSquareWarning, 
+  Search,
+  ShieldAlert // Ícone adicionado para o formulário de denúncia
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -64,6 +79,13 @@ function CallCheckPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [temProxima, setTemProxima] = useState(false);
 
+  // === NOVOS ESTADOS: SISTEMA DE DENÚNCIA ===
+  const [showDenunciaForm, setShowDenunciaForm] = useState(false);
+  const [tipoDenuncia, setTipoDenuncia] = useState('');
+  const [descricaoDenuncia, setDescricaoDenuncia] = useState('');
+  const [isSubmittingDenuncia, setIsSubmittingDenuncia] = useState(false);
+  const [denunciaSucesso, setDenunciaSucesso] = useState(false);
+
   const handleValidation = async (pageToFetch = 1) => {
     if (!phoneInput && !companyInput) return;
     
@@ -71,6 +93,12 @@ function CallCheckPage() {
     setValidationResult(null);
     setMensagemBackend(''); 
     setDadosCompletos(null); 
+
+    // Limpa o formulário de denúncia a cada nova busca
+    setShowDenunciaForm(false);
+    setDenunciaSucesso(false);
+    setTipoDenuncia('');
+    setDescricaoDenuncia('');
 
     let telefoneLimpo = '';
     if (phoneInput) {
@@ -124,6 +152,41 @@ function CallCheckPage() {
       setMensagemBackend('Erro de conexão com o servidor. Verifique se o backend está rodando.');
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  // === NOVA FUNÇÃO: ENVIAR DENÚNCIA ===
+  const handleEnviarDenuncia = async () => {
+    if (!tipoDenuncia) return;
+    setIsSubmittingDenuncia(true);
+
+    try {
+      let telefoneLimpo = phoneInput ? phoneInput.replace(/\D/g, '') : '';
+      
+      const response = await fetch('https://callcheck.onrender.com/api/denuncias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          telefone: telefoneLimpo, 
+          empresa: companyInput,
+          tipo: tipoDenuncia, // ENUM: GOLPE, SPAM, FALSO_ATENDIMENTO
+          descricao: descricaoDenuncia
+        })
+      });
+
+      if (response.ok) {
+        setDenunciaSucesso(true);
+      } else {
+        // Tratar erro do banco ou de FK
+        alert("Não foi possível registrar a denúncia no momento. Verifique os dados.");
+      }
+    } catch (error) {
+      console.error("Erro ao enviar denúncia:", error);
+      alert("Erro de conexão ao enviar a denúncia.");
+    } finally {
+      setIsSubmittingDenuncia(false);
     }
   };
 
@@ -434,6 +497,53 @@ function CallCheckPage() {
                           ))}
                         </div>
                       )}
+                      
+                      {/* BLOCO DE DENÚNCIA PARA STATUS RISCO */}
+                      <div className="mt-4 pl-9 w-full">
+                        {!showDenunciaForm ? (
+                          <Button 
+                            onClick={() => setShowDenunciaForm(true)}
+                            variant="outline"
+                            className="bg-transparent hover:bg-white/5 text-gray-300 border-white/20 w-full md:w-auto h-10"
+                          >
+                            <ShieldAlert className="w-4 h-4 mr-2" /> Adicionar nova denúncia
+                          </Button>
+                        ) : denunciaSucesso ? (
+                          <div className="bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20 p-4 rounded-lg text-sm flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                            Denúncia registrada no banco com sucesso!
+                          </div>
+                        ) : (
+                          <div className="bg-black/40 border border-white/10 p-5 rounded-xl flex flex-col gap-4">
+                            <div className="flex items-center gap-2 text-white font-medium">
+                              <ShieldAlert className="w-5 h-5 text-red-400" />
+                              <span>Registrar Denúncia</span>
+                            </div>
+                            <select 
+                              value={tipoDenuncia}
+                              onChange={(e) => setTipoDenuncia(e.target.value)}
+                              className="h-12 bg-[#111827] border border-white/10 text-white rounded-xl px-4 text-sm focus:ring-2 focus:ring-red-500/50 outline-none w-full appearance-none"
+                            >
+                              <option value="">Selecione o tipo...</option>
+                              <option value="GOLPE">Golpe / Fraude</option>
+                              <option value="SPAM">Spam / Assédio Comercial</option>
+                              <option value="FALSO_ATENDIMENTO">Falso Atendimento</option>
+                            </select>
+                            <textarea 
+                              value={descricaoDenuncia}
+                              onChange={(e) => setDescricaoDenuncia(e.target.value)}
+                              placeholder="Detalhes (opcional)..."
+                              className="min-h-[100px] bg-[#111827] border border-white/10 text-white rounded-xl p-4 text-sm focus:ring-2 focus:ring-red-500/50 outline-none resize-y w-full"
+                            />
+                            <div className="flex gap-3 justify-end">
+                              <Button variant="ghost" onClick={() => setShowDenunciaForm(false)} className="text-gray-400 hover:text-white">Cancelar</Button>
+                              <RippleButton onClick={handleEnviarDenuncia} disabled={!tipoDenuncia || isSubmittingDenuncia} className="bg-red-600 hover:bg-red-700 text-white">
+                                {isSubmittingDenuncia ? "Enviando..." : "Confirmar"}
+                              </RippleButton>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </motion.div>
                   ) : validationResult === 'invalid' ? (
                     <motion.div 
@@ -449,6 +559,54 @@ function CallCheckPage() {
                       <div className="mt-1 pl-9 text-sm text-gray-400">
                         O termo ou telefone pesquisado não consta nos registros oficiais cadastrados ou falhou na checagem.
                       </div>
+
+                      {/* BLOCO DE DENÚNCIA PARA STATUS INVALID */}
+                      <div className="mt-4 pl-9 w-full">
+                        {!showDenunciaForm ? (
+                          <Button 
+                            onClick={() => setShowDenunciaForm(true)}
+                            variant="outline"
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 w-full md:w-auto h-10"
+                          >
+                            <ShieldAlert className="w-4 h-4 mr-2" /> Relatar este número
+                          </Button>
+                        ) : denunciaSucesso ? (
+                          <div className="bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20 p-4 rounded-lg text-sm flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                            Denúncia registrada no banco com sucesso!
+                          </div>
+                        ) : (
+                          <div className="bg-black/40 border border-white/10 p-5 rounded-xl flex flex-col gap-4">
+                            <div className="flex items-center gap-2 text-white font-medium">
+                              <ShieldAlert className="w-5 h-5 text-red-400" />
+                              <span>Registrar Denúncia</span>
+                            </div>
+                            <select 
+                              value={tipoDenuncia}
+                              onChange={(e) => setTipoDenuncia(e.target.value)}
+                              className="h-12 bg-[#111827] border border-white/10 text-white rounded-xl px-4 text-sm focus:ring-2 focus:ring-red-500/50 outline-none w-full appearance-none"
+                            >
+                              <option value="">Selecione o tipo de ocorrência...</option>
+                              <option value="GOLPE">Golpe / Fraude</option>
+                              <option value="SPAM">Spam / Assédio Comercial</option>
+                              <option value="FALSO_ATENDIMENTO">Falso Atendimento</option>
+                            </select>
+                            <textarea 
+                              value={descricaoDenuncia}
+                              onChange={(e) => setDescricaoDenuncia(e.target.value)}
+                              placeholder="Descreva brevemente o que aconteceu..."
+                              className="min-h-[100px] bg-[#111827] border border-white/10 text-white rounded-xl p-4 text-sm focus:ring-2 focus:ring-red-500/50 outline-none resize-y w-full placeholder:text-gray-500"
+                            />
+                            <div className="flex gap-3 justify-end">
+                              <Button variant="ghost" onClick={() => setShowDenunciaForm(false)} className="text-gray-400 hover:text-white hover:bg-white/5">Cancelar</Button>
+                              <RippleButton onClick={handleEnviarDenuncia} disabled={!tipoDenuncia || isSubmittingDenuncia} className="bg-red-600 hover:bg-red-700 text-white font-semibold">
+                                {isSubmittingDenuncia ? "Enviando..." : "Confirmar Denúncia"}
+                              </RippleButton>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                     </motion.div>
                   ) : (
                     <span className="text-gray-500 text-sm transition-opacity duration-300">O resultado da busca detalhada aparecerá aqui</span>
