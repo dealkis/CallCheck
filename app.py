@@ -5,6 +5,8 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
 import os
+import re
+import unicodedata
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
@@ -45,16 +47,13 @@ def formatar_telefone(ddd, num):
     if not ddd or not num:
         return "Não informado"
     
-    # Limpa tudo e garante que ddd e num sejam apenas dígitos
     num = "".join(filter(str.isdigit, num))
     ddd = "".join(filter(str.isdigit, ddd))
     
-    # SE O DDD FOR "55", IGNORAMOS E PEGAMOS O PRÓXIMO COMO DDD REAL
     if ddd == "55" and len(num) >= 2:
         ddd = num[:2]
         num = num[2:]
         
-    # Formatação final: +55 (DDD) XXXX-XXXX
     if len(num) == 9:
         return f"+55 ({ddd}) {num[0]} {num[1:5]}-{num[5:]}"
     elif len(num) == 8:
@@ -63,16 +62,23 @@ def formatar_telefone(ddd, num):
         return f"+55 ({ddd}) {num}"
 
 def formatar_numero_completo(numero):
-    """Aplica a formatação +55 (DDD) XXXX-XXXX"""
     if not numero: return "Não informado"
     limpo = limpar_telefone(numero)
     
-    # Se for um número tipo 0800 ou muito curto, retorna sem o +55
     if limpo.startswith('0800') or len(limpo) < 10:
         return numero
     else:
-        # Pega os 2 primeiros dígitos como DDD e o restante como número
         return formatar_telefone(limpo[:2], limpo[2:])
+
+def normalizar_nome(texto):
+    if not texto: return ""
+    texto = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8').lower()
+    texto = re.sub(r'[^a-z0-9\s]', '', texto)
+    texto = texto.replace(' sa ', ' ').replace(' ltda ', ' ').replace(' s a ', ' ')
+    if texto.endswith(' sa'): texto = texto[:-3]
+    if texto.endswith(' s a'): texto = texto[:-4]
+    if texto.endswith(' ltda'): texto = texto[:-5]
+    return texto.strip()
 
 # =========================
 # LÓGICA DE VERIFICAÇÃO (NOME + TELEFONE + DENÚNCIAS)
@@ -87,7 +93,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             telefone_limpo = limpar_telefone(telefone)
 
             # ==============================================================
-            # PASSO 1: VERIFICAÇÃO DE DENÚNCIAS (PRIORIDADE MÁXIMA)
+            # PASSO 1: VERIFICAÇÃO DE DENÚNCIAS (PRIORIDADE MÁXIMA PARA BUSCA POR TEL)
             # ==============================================================
             if telefone_limpo:
                 try:
@@ -110,67 +116,59 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 except Exception as e:
                     print("Aviso: Falha ao consultar denúncias.", e)
 
-            # Preparação das variáveis de busca
             tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
-            termo_busca = f"%{nome}%" if nome else ""
 
             # ==============================================================
-            # CENÁRIO 1: BUSCA POR NOME + TELEFONE (AQUI ESTAVA O ERRO)
+            # CENÁRIO 1: BUSCA POR NOME + TELEFONE
             # ==============================================================
             if nome and telefone_limpo:
-                query = """
+                cursor.execute("""
                     SELECT empresa_nome, numero, verificada
                     FROM (
-                        -- 1. Base Oficial
                         SELECT e.nome AS empresa_nome, t.numero, e.verificada
-                        FROM empresa e
-                        JOIN telefone t ON t.empresa_id = e.id
-                        WHERE e.nome ILIKE %s 
-                          AND REGEXP_REPLACE(t.numero, '\D', '', 'g') IN (%s, %s)
+                        FROM telefone t
+                        LEFT JOIN empresa e ON t.empresa_id = e.id
+                        WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') IN (%s, %s)
                         
                         UNION ALL
                         
-                        -- 2. Base da Receita (Buscando no telefone 1)
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone1 AS VARCHAR) AS numero, false AS verificada
-                        FROM empresa_receita er
-                        JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
-                        WHERE er.nome ILIKE %s 
-                          AND tr.telefone1 IS NOT NULL
-                          AND REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
+                        FROM telefone_receita tr
+                        LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
+                        WHERE tr.telefone1 IS NOT NULL AND REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
                         
                         UNION ALL
                         
-                        -- 3. Base da Receita (Buscando no telefone 2)
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone2 AS VARCHAR) AS numero, false AS verificada
-                        FROM empresa_receita er
-                        JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
-                        WHERE er.nome ILIKE %s 
-                          AND tr.telefone2 IS NOT NULL
-                          AND REGEXP_REPLACE(tr.telefone2, '\D', '', 'g') IN (%s, %s)
+                        FROM telefone_receita tr
+                        LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
+                        WHERE tr.telefone2 IS NOT NULL AND REGEXP_REPLACE(tr.telefone2, '\D', '', 'g') IN (%s, %s)
                     ) sub
                     LIMIT 1
-                """
+                """, (telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55))
                 
-                # Passamos os 9 parâmetros exigidos pela query acima
-                cursor.execute(query, (
-                    termo_busca, telefone_limpo, tel_sem_55,
-                    termo_busca, telefone_limpo, tel_sem_55,
-                    termo_busca, telefone_limpo, tel_sem_55
-                ))
                 resultado = cursor.fetchone()
 
                 if resultado:
-                    # Forçamos o status para 'OFICIAL' para aproveitar o padrão do seu frontend,
-                    # mas personalizamos a mensagem caso venha da Receita Federal.
-                    mensagem_final = "Número verificado e seguro!" if resultado["verificada"] else "Verificado pela base da Receita Federal."
-                    
-                    return {
-                        "empresa": resultado["empresa_nome"],
-                        "telefone": formatar_numero_completo(resultado["numero"]),
-                        "status": "OFICIAL",
-                        "uf": uf or "",
-                        "mensagem": mensagem_final  # <--- Corrigido aqui (estava mensaje_final)
-                    }
+                    nome_banco_norm = normalizar_nome(resultado["empresa_nome"])
+                    nome_input_norm = normalizar_nome(nome)
+
+                    if nome_input_norm in nome_banco_norm or nome_banco_norm in nome_input_norm:
+                        mensagem_final = "Número verificado e seguro!" if resultado["verificada"] else "Verificado pela base da Receita Federal."
+                        return {
+                            "empresa": resultado["empresa_nome"],
+                            "telefone": formatar_numero_completo(resultado["numero"]),
+                            "status": "OFICIAL",
+                            "uf": uf or "",
+                            "mensagem": mensagem_final
+                        }
+                    else:
+                        return {
+                            "empresa": nome,
+                            "telefone": formatar_numero_completo(telefone),
+                            "status": "NAO_OFICIAL",
+                            "mensagem": f"ALERTA: Este número pertence a OUTRA empresa ({resultado['empresa_nome']})."
+                        }
                 else:
                     return {
                         "empresa": nome,
@@ -221,7 +219,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 return {"empresa": None, "telefone": formatar_numero_completo(telefone), "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
             # ==============================================================
-            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA)
+            # CENÁRIO 3: BUSCA APENAS POR NOME (AGORA CHECA DENÚNCIAS TAMBÉM)
             # ==============================================================
             elif nome:
                 por_pagina = 10
@@ -252,10 +250,22 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 lista_resultados = []
                 for emp in empresas[:por_pagina]:
                     telefones = []
+                    denuncia_msg = None # Nova variável para guardar se achou denúncia
                     
                     if emp['origem'] == 'base_empresa':
-                        cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (emp['id'],))
-                        telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall() if row['numero']]
+                        # Alterado para fazer JOIN com a tabela denúncia
+                        cursor.execute("""
+                            SELECT t.numero, d.descricao 
+                            FROM telefone t
+                            LEFT JOIN denuncia d ON d.telefone_id = t.id
+                            WHERE t.empresa_id = %s
+                        """, (emp['id'],))
+                        
+                        for row in cursor.fetchall():
+                            if row['numero']:
+                                telefones.append(formatar_numero_completo(row['numero']))
+                            if row['descricao'] and not denuncia_msg:
+                                denuncia_msg = f"Motivo: {row['descricao']}"
                     else:
                         if emp.get('tel1'): telefones.append(formatar_numero_completo(emp['tel1']))
                         if emp.get('tel2'): telefones.append(formatar_numero_completo(emp['tel2']))
@@ -263,7 +273,8 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     lista_resultados.append({
                         "empresa": emp["nome"], 
                         "telefones": telefones, 
-                        "uf": uf or ""
+                        "uf": uf or "",
+                        "denuncias": denuncia_msg # Passa pro frontend se estiver sujo
                     })
 
                 return {
@@ -281,8 +292,9 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             print("Erro detalhado no banco de dados:", str(e))
             return {"status": "ERRO", "mensagem": "Falha na comunicação com o banco de dados."}
 
+
 # =========================================================================
-# NOVA ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT
+# ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT (AJUSTADA)
 # =========================================================================
 @app.route("/api/validar", methods=["POST"])
 def api_validar_telefone():
@@ -291,7 +303,6 @@ def api_validar_telefone():
     if not dados:
         return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado"}), 400
         
-    # Proteção ativa para garantir que None/null vire string vazia antes do .strip()
     nome_bruto = dados.get("empresa") or dados.get("nome") or ""
     nome = str(nome_bruto).strip()
     
@@ -305,30 +316,42 @@ def api_validar_telefone():
     if not isinstance(pagina, int):
         pagina = 1
 
-    # Executa a função interna de banco de dados
     resposta_db = verificar_empresa(nome, telefone, pagina, uf)
     
-    # Se a busca foi por texto e gerou uma LISTA, adaptamos TODOS os itens para o React
+    # =====================================================
+    # SE FOR UMA LISTA (BUSCA POR NOME), VARRE VERIFICANDO RISCOS
+    # =====================================================
     if resposta_db.get("status") == "LISTA":
         resultados = resposta_db.get("resultados", [])
         if resultados:
             dados_adaptados = []
+            tem_denuncia_na_lista = False
             
-            # Varre todos os resultados encontrados em vez de pegar só o [0]
             for reg in resultados:
                 lista_tels = reg.get("telefones", [])
                 tel_exibir = lista_tels[0] if lista_tels else "Não informado"
+                denuncia_item = reg.get("denuncias")
                 
+                if denuncia_item:
+                    tem_denuncia_na_lista = True
+                    
                 dados_adaptados.append({
                     "empresa": reg.get("empresa"),
                     "telefone": tel_exibir,
-                    "status": "ENCONTRADO"
+                    "status": "RISCO" if denuncia_item else "ENCONTRADO",
+                    "denuncias": denuncia_item
                 })
                 
+            # O "Pulo do Gato": Se achou denúncia em ALGUÉM da lista, a tela inteira fica amarela (risco)
+            status_global = "risco" if tem_denuncia_na_lista else "valid"
+            msg_global = "⚠️ Atenção: Encontramos registros com alertas vinculados a esta empresa!" if tem_denuncia_na_lista else f"✅ {len(dados_adaptados)} registros encontrados!"
+            
             return jsonify({
-                "status": "valid", 
-                "mensagem": f"✅ {len(dados_adaptados)} registros encontrados!",
-                "dados": dados_adaptados # Agora estamos enviando a lista inteira (Array)
+                "status": status_global, 
+                "mensagem": msg_global,
+                "dados": dados_adaptados,
+                "pagina_atual": resposta_db.get("pagina_atual", 1),
+                "tem_proxima": resposta_db.get("tem_proxima", False)
             })
         else:
             return jsonify({
@@ -339,14 +362,14 @@ def api_validar_telefone():
                 }
             })
     
-    # Mapeia as suas respostas estruturadas para o formato simples esperado pela CallCheckPage.jsx
+    # Tratamento padrão para busca individual
     if resposta_db.get("status") in ["OFICIAL", "ENCONTRADO"]:
         return jsonify({"status": "valid", "dados": resposta_db})
     elif resposta_db.get("status") == "RISCO":
         return jsonify({"status": "invalid", "dados": resposta_db})
     else:
-        # Casos NAO_OFICIAL, NAO_ENCONTRADO ou erros internos
         return jsonify({"status": "invalid", "dados": resposta_db})
+
 
 # =========================
 # ROTAS PÚBLICAS E DENÚNCIAS
@@ -367,9 +390,7 @@ def index():
             resultado = verificar_empresa(nome, telefone, pagina, uf)
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
-# =========================================================================
-# ROTA DE DENÚNCIAS CORRIGIDA E BLINDADA PARA O REACT
-# =========================================================================
+
 @app.route("/api/denuncias", methods=["POST"])
 def api_registrar_denuncia():
     dados = request.get_json()
@@ -393,7 +414,6 @@ def api_registrar_denuncia():
         try:
             cursor = conn.cursor()
             
-            # 1. Verifica se o número já existe na tabela 'telefone'
             cursor.execute("""
                 SELECT id FROM telefone 
                 WHERE REGEXP_REPLACE(numero, '\D', '', 'g') = %s 
@@ -404,8 +424,6 @@ def api_registrar_denuncia():
             if tel_row:
                 telefone_id = tel_row[0]
             else:
-                # 2. Se não existir, insere na tabela telefone primeiro
-                # ATENÇÃO: Se der erro aqui, o ENUM da tabela telefone pode ser diferente de 'desconhecido'
                 cursor.execute("""
                     INSERT INTO telefone (numero, tipo, suspeito, principal) 
                     VALUES (%s, 'desconhecido', true, false) 
@@ -413,7 +431,6 @@ def api_registrar_denuncia():
                 """, (telefone_limpo,)) 
                 telefone_id = cursor.fetchone()[0]
             
-            # 3. Insere o registro na tabela denuncia com as chaves exatas do banco
             cursor.execute("""
                 INSERT INTO denuncia (telefone_id, tipo, descricao) 
                 VALUES (%s, %s, %s)
@@ -445,7 +462,8 @@ def api_registrar_denuncia():
                 "status": "ERRO", 
                 "mensagem": f"Falha interna no banco de dados: {str(e)}"
             }), 500
-            
+
+
 @app.route("/sobre")
 def sobre():
     return render_template("sobre.html")
@@ -454,22 +472,18 @@ def sobre():
 def contato():
     return render_template("contato.html")
 
-# =========================
-# LOGIN E PERFIL
-# =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "usuario_logado" in session: return redirect(url_for('perfil_usuario'))
     erro = None
     if request.method == "POST":
-        usuario_input = request.form.get("usuario") # Capturamos do mesmo campo name="usuario" no template
+        usuario_input = request.form.get("usuario") 
         senha = request.form.get("senha")
         
         with conectar() as conn:
             if conn:
                 try:
                     cursor = conn.cursor(cursor_factory=RealDictCursor)
-                    # Verifica login real buscando na nova tabela "usuario"
                     cursor.execute("""
                         SELECT id, nome, email 
                         FROM usuario 
@@ -513,9 +527,6 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# =========================
-# ROTAS ESPECÍFICAS (PRESERVADAS)
-# =========================
 @app.route("/historico")
 def historico():
     if "usuario_logado" not in session: return redirect(url_for('login'))
@@ -527,9 +538,6 @@ def denuncia():
     if "usuario_logado" not in session: return redirect(url_for('login'))
     return render_template("em_obras.html")
 
-# =========================
-# ADMINISTRAÇÃO
-# =========================
 @app.route("/admin")
 def admin():
     if "usuario_logado" not in session: return redirect(url_for('login'))
@@ -548,11 +556,9 @@ def listar_empresas():
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             
-            # Conta o total para paginação usando a tabela 'empresa'
             cursor.execute("SELECT COUNT(*) FROM empresa WHERE nome IS NOT NULL AND nome != ''")
             total_reg = cursor.fetchone()['count']
             
-            # Mapamento no SQL com apelidos para renderizar corretamente no "empresas.html"
             query = """
                 SELECT 
                     e.cnpj AS cnpj_base, 
@@ -581,7 +587,6 @@ def visualizar_empresa(cnpj_base):
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             
-            # Busca a empresa pelo CNPJ, forçando chave similar para compatibilidade de template
             cursor.execute("""
                 SELECT id, nome AS nome_fantasia, cnpj, verificada 
                 FROM empresa 
@@ -590,7 +595,6 @@ def visualizar_empresa(cnpj_base):
             empresa = cursor.fetchone()
             
             if empresa:
-                # Busca telefones vinculados a esta empresa
                 cursor.execute("""
                     SELECT numero, tipo, suspeito, principal 
                     FROM telefone 
@@ -598,7 +602,6 @@ def visualizar_empresa(cnpj_base):
                 """, (empresa['id'],))
                 telefones = cursor.fetchall()
                 
-                # Injeta dados de telefones dinamicamente no dict pra o loop for renderizar
                 for idx, t in enumerate(telefones):
                     empresa[f"telefone_{idx+1}"] = t['numero']
                     empresa[f"tipo_{idx+1}"] = t['tipo']
@@ -616,7 +619,6 @@ def database_view():
         if conn is None: return "Erro ao conectar ao banco de dados.", 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # Replicado o mapeamento "AS" para simular o modelo flat anterior perfeitamente
             cursor.execute("""
                 SELECT 
                     e.cnpj AS cnpj_base, 
