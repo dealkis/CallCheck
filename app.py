@@ -112,13 +112,10 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
             # Preparação das variáveis de busca
             tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
-            
-            # Limpa o nome tirando espaços e pontuações para não dar erro entre "S.A." e "SA"
-            nome_limpo_busca = "".join(filter(str.isalnum, nome)).upper() if nome else ""
-            termo_busca = f"%{nome_limpo_busca}%"
+            termo_busca = f"%{nome}%" if nome else ""
 
             # ==============================================================
-            # CENÁRIO 3: BUSCA POR NOME + TELEFONE
+            # CENÁRIO 1: BUSCA POR NOME + TELEFONE (AQUI ESTAVA O ERRO)
             # ==============================================================
             if nome and telefone_limpo:
                 query = """
@@ -128,7 +125,8 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         SELECT e.nome AS empresa_nome, t.numero, e.verificada
                         FROM empresa e
                         JOIN telefone t ON t.empresa_id = e.id
-                        WHERE REGEXP_REPLACE(UPPER(e.nome), '[^A-Z0-9]', '', 'g') ILIKE %s
+                        WHERE e.nome ILIKE %s 
+                          AND REGEXP_REPLACE(t.numero, '\D', '', 'g') IN (%s, %s)
                         
                         UNION ALL
                         
@@ -136,22 +134,29 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone1 AS VARCHAR) AS numero, false AS verificada
                         FROM empresa_receita er
                         JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
-                        WHERE REGEXP_REPLACE(UPPER(er.nome), '[^A-Z0-9]', '', 'g') ILIKE %s
-                        AND tr.telefone1 IS NOT NULL
+                        WHERE er.nome ILIKE %s 
+                          AND tr.telefone1 IS NOT NULL
+                          AND REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
                         
                         UNION ALL
                         
-                        -- 3. Base da Receita (Buscando no telefone 2 - AQUI ESTAVA O ERRO ANTES!)
+                        -- 3. Base da Receita (Buscando no telefone 2)
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone2 AS VARCHAR) AS numero, false AS verificada
                         FROM empresa_receita er
                         JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
-                        WHERE REGEXP_REPLACE(UPPER(er.nome), '[^A-Z0-9]', '', 'g') ILIKE %s
-                        AND tr.telefone2 IS NOT NULL
-                    ) e
-                    WHERE REGEXP_REPLACE(numero, '\D', '', 'g') IN (%s, %s)
+                        WHERE er.nome ILIKE %s 
+                          AND tr.telefone2 IS NOT NULL
+                          AND REGEXP_REPLACE(tr.telefone2, '\D', '', 'g') IN (%s, %s)
+                    ) sub
                     LIMIT 1
                 """
-                cursor.execute(query, (termo_busca, termo_busca, termo_busca, telefone_limpo, tel_sem_55))
+                
+                # Passamos os 9 parâmetros exigidos pela query acima
+                cursor.execute(query, (
+                    termo_busca, telefone_limpo, tel_sem_55,
+                    termo_busca, telefone_limpo, tel_sem_55,
+                    termo_busca, telefone_limpo, tel_sem_55
+                ))
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -171,7 +176,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     }
 
             # ==============================================================
-            # CENÁRIO 1: BUSCA APENAS POR TELEFONE
+            # CENÁRIO 2: BUSCA APENAS POR TELEFONE
             # ==============================================================
             elif telefone_limpo and not nome:
                 cursor.execute("""
@@ -187,15 +192,15 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone1 AS VARCHAR) AS numero, false AS verificada
                         FROM telefone_receita tr
                         LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
-                        WHERE REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
+                        WHERE tr.telefone1 IS NOT NULL AND REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
                         
                         UNION ALL
                         
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone2 AS VARCHAR) AS numero, false AS verificada
                         FROM telefone_receita tr
                         LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
-                        WHERE REGEXP_REPLACE(tr.telefone2, '\D', '', 'g') IN (%s, %s)
-                    ) e
+                        WHERE tr.telefone2 IS NOT NULL AND REGEXP_REPLACE(tr.telefone2, '\D', '', 'g') IN (%s, %s)
+                    ) sub
                     LIMIT 1
                 """, (telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55))
                 resultado = cursor.fetchone()
@@ -212,14 +217,11 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 return {"empresa": None, "telefone": formatar_numero_completo(telefone), "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
             # ==============================================================
-            # CENÁRIO 2: BUSCA APENAS POR NOME (PAGINADA)
+            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA)
             # ==============================================================
             elif nome:
                 por_pagina = 10
                 offset = (pagina - 1) * por_pagina
-                
-                # Para listar não somos tão restritivos com a remoção de caracteres, 
-                # usamos o padrão normal com % para permitir que o ILIKE faça o seu trabalho
                 termo_busca_lista = f"%{nome}%" 
                 
                 cursor.execute("""
