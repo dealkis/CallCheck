@@ -34,7 +34,7 @@ const RippleButton = ({ children, className, onClick, ...props }) => {
       ref={buttonRef}
       onClick={handleClick}
       className={`ripple-container relative overflow-hidden transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 ${className}`}
-      {...props}
+      ...props
     >
       {children}
       {ripples.map((ripple) => (
@@ -55,14 +55,18 @@ const RippleButton = ({ children, className, onClick, ...props }) => {
 
 function CallCheckPage() {
   const [phoneInput, setPhoneInput] = useState('');
-  const [companyInput, setCompanyInput] = useState(''); // <-- Novo estado para o input da empresa
+  const [companyInput, setCompanyInput] = useState(''); 
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
   const [mensagemBackend, setMensagemBackend] = useState(''); 
   const [dadosCompletos, setDadosCompletos] = useState(null); 
+  
+  // 🌟 NOVO: Estados para controlar a paginação no React
+  const [currentPage, setCurrentPage] = useState(1);
+  const [temProxima, setTemProxima] = useState(false);
 
-  const handleValidation = async () => {
-    // Só prossegue se pelo menos um dos campos estiver preenchido
+  // Alterado para receber a página desejada (padrão é 1 para novas buscas)
+  const handleValidation = async (pageToFetch = 1) => {
     if (!phoneInput && !companyInput) return;
     
     setIsValidating(true);
@@ -84,7 +88,7 @@ function CallCheckPage() {
     }
 
     try {
-      // Chama a sua API Flask enviando os dois campos estruturados
+      // Chama a sua API Flask enviando os campos e a página atual do fluxo
       const response = await fetch('https://callcheck.onrender.com/api/validar', {
         method: 'POST',
         headers: {
@@ -92,7 +96,8 @@ function CallCheckPage() {
         },
         body: JSON.stringify({ 
           telefone: telefoneLimpo || null, 
-          empresa: companyInput.trim() || null 
+          empresa: companyInput.trim() || null,
+          pagina: pageToFetch // 🌟 ENVIANDO A PÁGINA PARA O BACKEND
         }) 
       });
 
@@ -105,6 +110,10 @@ function CallCheckPage() {
       setMensagemBackend(mensagemRetornada);
 
       const statusRetornado = dados.status || dadosDoObjeto.status;
+
+      // 🌟 SALVANDO O RETORNO DA PAGINAÇÃO DO BACKEND
+      setCurrentPage(dados.pagina_atual || dadosDoObjeto.pagina_atual || pageToFetch);
+      setTemProxima(dados.tem_proxima || dadosDoObjeto.tem_proxima || false);
 
       if (statusRetornado === 'OFICIAL' || statusRetornado === 'ENCONTRADO' || statusRetornado === 'valid') {
         setValidationResult('valid');
@@ -125,7 +134,7 @@ function CallCheckPage() {
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
-      handleValidation();
+      handleValidation(1); // Nova busca começa na página 1
     }
   };
 
@@ -193,10 +202,7 @@ function CallCheckPage() {
               Valide números telefônicos ou empresas com precisão e elimine contatos falsos da sua base.
             </motion.p>
 
-            <motion.div 
-              className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-              variants={itemVariants}
-            >
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <RippleButton 
                 size="lg" 
                 className="bg-[#22C55E] hover:bg-[#22C55E] text-white font-semibold px-8 py-6 text-lg rounded-xl hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] border border-transparent"
@@ -211,7 +217,7 @@ function CallCheckPage() {
               >
                 Ver demonstração
               </RippleButton>
-            </motion.div>
+            </div>
           </motion.div>
         </section>
 
@@ -225,12 +231,12 @@ function CallCheckPage() {
             viewport={{ once: true, margin: "-100px" }}
           >
             <div className="text-center mb-16">
-              <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 O Custo dos Dados Ruins
-              </motion.h2>
-              <motion.p variants={itemVariants} className="text-gray-400 text-lg max-w-2xl mx-auto">
+              </h2>
+              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
                 Manter números inválidos na sua base drena recursos e diminui a eficiência da sua equipe de vendas.
-              </motion.p>
+              </p>
             </div>
             
             <div className="flex flex-wrap justify-center gap-[20px]">
@@ -239,15 +245,14 @@ function CallCheckPage() {
                 { icon: TrendingDown, title: 'Leads falsos', desc: 'Desperdício de recursos em contatos que não convertem.' },
                 { icon: Clock, title: 'Tempo perdido', desc: 'Horas gastas tentando contatar números inexistentes.' }
               ].map((item, i) => (
-                <motion.div 
+                <div 
                   key={i}
-                  variants={itemVariants}
                   className="bg-[#111827] p-[20px] rounded-[12px] w-[250px] border border-white/5 transition-all duration-300 ease-in-out hover:scale-105 hover:-translate-y-[5px] hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:border-[#EF4444]/30"
                 >
                   <item.icon className="w-8 h-8 text-[#EF4444] mb-4" />
                   <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
                   <p className="text-sm text-gray-400 leading-relaxed">{item.desc}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -263,12 +268,12 @@ function CallCheckPage() {
             viewport={{ once: true, margin: "-100px" }}
           >
             <div className="text-center mb-16">
-              <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 Nossa Solução
-              </motion.h2>
-              <motion.p variants={itemVariants} className="text-gray-400 text-lg max-w-2xl mx-auto">
+              </h2>
+              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
                 Tecnologia avançada para garantir que cada número na sua lista seja uma oportunidade real.
-              </motion.p>
+              </p>
             </div>
             
             <div className="flex flex-wrap justify-center gap-[20px]">
@@ -277,15 +282,14 @@ function CallCheckPage() {
                 { icon: CheckCircle2, title: 'Identificação activa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
                 { icon: Shield, title: 'Detecção de spam', desc: 'Identifique números com formato suspeito ou incompleto.' }
               ].map((item, i) => (
-                <motion.div 
+                <div 
                   key={i}
-                  variants={itemVariants}
                   className="bg-[#111827] p-[20px] rounded-[12px] w-[250px] border border-white/5 transition-all duration-300 ease-in-out hover:scale-105 hover:-translate-y-[5px] hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:border-[#22C55E]/30"
                 >
                   <item.icon className="w-8 h-8 text-[#22C55E] mb-4" />
                   <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
                   <p className="text-sm text-gray-400 leading-relaxed">{item.desc}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -301,15 +305,15 @@ function CallCheckPage() {
             viewport={{ once: true, margin: "-100px" }}
           >
             <div className="text-center mb-10">
-              <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 Painel de Consulta
-              </motion.h2>
-              <motion.p variants={itemVariants} className="text-gray-400 text-lg">
+              </h2>
+              <p className="text-gray-400 text-lg">
                 Pesquise por Telefone, Nome da Empresa ou use ambos os filtros.
-              </motion.p>
+              </p>
             </div>
 
-            <motion.div variants={itemVariants}>
+            <div>
               <Card className="p-8 bg-[#111827] border-white/10 shadow-2xl">
                 {/* Inputs empilhados verticalmente */}
                 <div className="flex flex-col gap-4 mb-8">
@@ -340,7 +344,7 @@ function CallCheckPage() {
                   </div>
 
                   <RippleButton 
-                    onClick={handleValidation}
+                    onClick={() => handleValidation(1)} // Começa da página 1 em nova busca
                     disabled={isValidating || (!phoneInput && !companyInput)}
                     className="bg-[#22C55E] hover:bg-[#22C55E] text-white font-semibold h-14 rounded-xl hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none mt-2 flex items-center justify-center text-lg w-full"
                   >
@@ -350,7 +354,7 @@ function CallCheckPage() {
                 </div>
 
                 {/* Bloco de Resposta dos Resultados */}
-                <div className="min-h-[80px] flex items-center justify-center rounded-xl bg-black/20 border border border-white/5 p-4 overflow-hidden">
+                <div className="min-h-[80px] flex items-center justify-center rounded-xl bg-black/20 border border-white/5 p-4 overflow-hidden">
                   {isValidating ? (
                     <div className="flex items-center gap-3 text-[#2563EB] animate-custom-pulse">
                       <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -381,6 +385,35 @@ function CallCheckPage() {
                               </div>
                             </div>
                           ))}
+
+                          {/* 🌟 NOVOS BOTÕES DE PAGINAÇÃO VISUAIS (Aparecem dentro do card de sucesso) */}
+                          {(temProxima || currentPage > 1) && (
+                            <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-white/10 w-full">
+                              {currentPage > 1 && (
+                                <Button
+                                  onClick={() => handleValidation(currentPage - 1)}
+                                  disabled={isValidating}
+                                  className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm py-1 px-4 h-9 rounded-lg transition-colors"
+                                >
+                                  ⬅️ Anterior
+                                </Button>
+                              )}
+                              
+                              <span className="text-gray-400 text-sm font-medium">
+                                Página {currentPage}
+                              </span>
+
+                              {temProxima && (
+                                <Button
+                                  onClick={() => handleValidation(currentPage + 1)}
+                                  disabled={isValidating}
+                                  className="bg-[#22C55E] hover:bg-[#1fba58] text-white text-sm py-1 px-4 h-9 rounded-lg shadow-md transition-colors"
+                                >
+                                  Próxima ➡️
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </motion.div>
@@ -434,7 +467,7 @@ function CallCheckPage() {
                   )}
                 </div>
               </Card>
-            </motion.div>
+            </div>
           </motion.div>
         </section>
 
@@ -448,12 +481,12 @@ function CallCheckPage() {
             viewport={{ once: true, margin: "-100px" }}
           >
             <div className="text-center mb-16">
-              <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 Benefícios Imediatos
-              </motion.h2>
-              <motion.p variants={itemVariants} className="text-gray-400 text-lg max-w-2xl mx-auto">
+              </h2>
+              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
                 Transforme sua operação de vendas com dados limpos e precisos.
-              </motion.p>
+              </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -462,9 +495,8 @@ function CallCheckPage() {
                 { icon: Users, title: 'Mais contatos reais', desc: 'Foque apenas em números válidos e aumente sua taxa de conversão significativamente.' },
                 { icon: Zap, title: 'Resultado instantâneo', desc: 'Validação em tempo real sem espera ou processamento demorado em lote.' }
               ].map((item, i) => (
-                <motion.div 
+                <div 
                   key={i}
-                  variants={itemVariants}
                   className="text-center p-8 bg-[#111827] rounded-2xl border border-white/5 transition-all duration-300 ease-in-out hover:scale-105 hover:-translate-y-[5px] hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:border-white/20"
                 >
                   <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center bg-[#2563EB]/10 rounded-2xl text-[#2563EB]">
@@ -472,7 +504,7 @@ function CallCheckPage() {
                   </div>
                   <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
                   <p className="text-gray-400 leading-relaxed">{item.desc}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -487,15 +519,15 @@ function CallCheckPage() {
             whileInView="show"
             viewport={{ once: true, margin: "-100px" }}
           >
-            <motion.h2 variants={itemVariants} className="text-4xl md:text-5xl font-bold mb-6" style={{ letterSpacing: '-0.02em' }}>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ letterSpacing: '-0.02em' }}>
               Pronto para validar seus contatos?
-            </motion.h2>
+            </h2>
             
-            <motion.p variants={itemVariants} className="text-xl text-gray-300 mb-10 leading-relaxed">
+            <p className="text-xl text-gray-300 mb-10 leading-relaxed">
               Comece agora e elimine números inválidos da sua base de forma definitiva.
-            </motion.p>
+            </p>
 
-            <motion.div variants={itemVariants}>
+            <div>
               <RippleButton 
                 size="lg" 
                 className="bg-[#22C55E] hover:bg-[#22C55E] text-white font-semibold px-12 py-7 text-lg rounded-xl hover:shadow-[0_0_25px_rgba(34,197,94,0.5)]"
@@ -503,7 +535,7 @@ function CallCheckPage() {
               >
                 Comece agora
               </RippleButton>
-            </motion.div>
+            </div>
           </motion.div>
         </section>
 
