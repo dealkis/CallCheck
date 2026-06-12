@@ -177,10 +177,10 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     
                     UNION ALL
                     
-                    SELECT empresa_receita.id, empresa_receita.nome, false AS verificada, 'receita' AS origem, CAST(telefone_receita.telefone_receita AS VARCHAR) AS telefone
+                    SELECT empresa_receita.id, empresa_receita.nome, false AS verificada, 'receita' AS origem, CAST(telefone_receita.telefone1 AS VARCHAR) AS telefone
                     FROM empresa_receita
-                    LEFT JOIN telefone_receita ON telefone_receita.empresa_receita_id = empresa_receita.id
-                    WHERE empresa_receita.nome ILIKE %s OR telefone_receita.telefone_receita ILIKE %s
+                    LEFT JOIN telefone_receita ON telefone_receita.cnpj_basico = empresa_receita.cnpj_basico
+                    WHERE empresa_receita.nome ILIKE %s OR telefone_receita.telefone1 ILIKE %s
                     
                     ORDER BY nome ASC 
                     LIMIT %s OFFSET %s
