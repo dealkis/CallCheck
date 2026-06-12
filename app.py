@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify # <-- Injetado jsonify aqui
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -108,22 +108,37 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 except Exception as e:
                     print("Aviso: Tabela de denúncias ou colunas podem estar indisponíveis.", e)
 
+            # ==============================================================
+            # TRATAMENTO DO DDI (55) QUE VEM DO FRONT-END
+            # ==============================================================
+            # O React adiciona "55", mas o DB pode estar sem. Vamos buscar das duas formas!
+            tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
+
             # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
             if nome and telefone_limpo:
                 termo_busca = f"%{nome}%"
                 query = """
-                    SELECT e.nome AS empresa_nome, t.numero, e.verificada
+                    SELECT empresa_nome, numero, verificada
                     FROM (
-                        SELECT id, nome, verificada, 'base_empresa' AS origem FROM empresa
+                        -- 1. Busca os telefones da base oficial
+                        SELECT e.nome AS empresa_nome, t.numero, e.verificada
+                        FROM empresa e
+                        JOIN telefone t ON t.empresa_id = e.id
+                        WHERE e.nome ILIKE %s
+                        
                         UNION ALL
-                        SELECT id, nome, false AS verificada, 'receita' AS origem FROM empresa_receita
+                        
+                        -- 2. Busca os telefones da base da Receita (que antes era ignorada)
+                        SELECT er.nome AS empresa_nome, CAST(tr.telefone1 AS VARCHAR) AS numero, false AS verificada
+                        FROM empresa_receita er
+                        JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
+                        WHERE er.nome ILIKE %s
                     ) e
-                    JOIN telefone t ON t.empresa_id = e.id AND e.origem = 'base_empresa'
-                    WHERE e.nome ILIKE %s 
-                      AND REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s
+                    -- Procura tanto o número com 55 quanto sem o 55
+                    WHERE REGEXP_REPLACE(numero, '\D', '', 'g') IN (%s, %s)
                     LIMIT 1
                 """
-                cursor.execute(query, (termo_busca, telefone_limpo))
+                cursor.execute(query, (termo_busca, termo_busca, telefone_limpo, tel_sem_55))
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -145,12 +160,22 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             # CENÁRIO 2: BUSCA APENAS POR TELEFONE
             elif telefone_limpo and not nome:
                 cursor.execute("""
-                    SELECT e.nome AS empresa_nome, t.numero, e.verificada
-                    FROM telefone t
-                    LEFT JOIN empresa e ON t.empresa_id = e.id
-                    WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s
+                    SELECT empresa_nome, numero, verificada
+                    FROM (
+                        SELECT e.nome AS empresa_nome, t.numero, e.verificada
+                        FROM telefone t
+                        LEFT JOIN empresa e ON t.empresa_id = e.id
+                        WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') IN (%s, %s)
+                        
+                        UNION ALL
+                        
+                        SELECT er.nome AS empresa_nome, CAST(tr.telefone1 AS VARCHAR) AS numero, false AS verificada
+                        FROM telefone_receita tr
+                        LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
+                        WHERE REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
+                    ) e
                     LIMIT 1
-                """, (telefone_limpo,))
+                """, (telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55))
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -283,6 +308,7 @@ def api_validar_telefone():
     else:
         # Casos NAO_OFICIAL, NAO_ENCONTRADO ou erros internos
         return jsonify({"status": "invalid", "dados": resposta_db})
+
 # =========================
 # ROTAS PÚBLICAS E DENÚNCIAS
 # =========================
@@ -539,9 +565,9 @@ if __name__ == "__main__":
 
 '''
  _____  ______     _     _       __ __ ______ ______ 
-|  __ \|  ____|   /\    | |    | |/ /|_   _|/ ____|
-| |  | | |__     /  \   | |    | ' /   | | | (___  
-| |  | |  __|   / /\ \  | |    |  <    | |  \___ \ 
+|  __ \|  ____|   /\    | |     | |/ /|_   _|/ ____|
+| |  | | |__     /  \   | |     | ' /   | | | (___  
+| |  | |  __|   / /\ \  | |     |  <    | |  \___ \ 
 | |__| | |____ / ____ \ | |____| . \  _| |_ ____) |
 |_____/|______|/_/    \_\______|_|\_\|_____|_____/
 
