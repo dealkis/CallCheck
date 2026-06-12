@@ -58,7 +58,7 @@ function CallCheckPage() {
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
   const [mensagemBackend, setMensagemBackend] = useState(''); 
-  const [dadosCompletos, setDadosCompletos] = useState(null); // <-- Novo estado para guardar o objeto completo do Python (empresa, telefone, denuncias, etc.)
+  const [dadosCompletos, setDadosCompletos] = useState(null); 
 
   const handleValidation = async () => {
     if (!phoneInput) return;
@@ -66,30 +66,40 @@ function CallCheckPage() {
     setIsValidating(true);
     setValidationResult(null);
     setMensagemBackend(''); 
-    setDadosCompletos(null); // Limpa os dados anteriores
+    setDadosCompletos(null); 
+
+    // --- QUALIDADE DE VIDA: Normalização do número antes do envio ---
+    // Remove qualquer caractere que não seja número (garante apenas dígitos)
+    let telefoneLimpo = phoneInput.replace(/\D/g, '');
+
+    // Se o usuário digitou apenas o número fixo ou celular sem DDD (8 ou 9 dígitos)
+    if (telefoneLimpo.length === 8 || telefoneLimpo.length === 9) {
+      telefoneLimpo = '5511' + telefoneLimpo; // Completa com o DDI 55 + DDD 11 padrão
+    } 
+    // Se o usuário digitou o número com DDD mas sem o 55 do país (10 ou 11 dígitos)
+    else if (telefoneLimpo.length === 10 || telefoneLimpo.length === 11) {
+      telefoneLimpo = '55' + telefoneLimpo; // Completa apenas com o DDI 55
+    }
+    // -----------------------------------------------------------------
 
     try {
-      // Chama a sua API Flask hospedada no Render
+      // Chama a sua API Flask hospedada no Render enviando o número já tratado
       const response = await fetch('https://callcheck.onrender.com/api/validar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        // Envia o telefone para o Python
-        body: JSON.stringify({ telefone: phoneInput }) 
+        body: JSON.stringify({ telefone: telefoneLimpo }) 
       });
 
       const dados = await response.json();
       
-      // Guarda o objeto de dados que veio de dentro da resposta do Python
-      // Se o seu python retorna tudo no objeto principal ou dentro de dados.dados, pegamos aqui:
       const dadosDoObjeto = dados.dados || dados;
       setDadosCompletos(dadosDoObjeto);
 
       const mensagemRetornada = dados.mensagem || dadosDoObjeto.mensagem || '';
       setMensagemBackend(mensagemRetornada);
 
-      // Define a cor/ícone baseado no status que o seu Python retornou
       const statusRetornado = dados.status || dadosDoObjeto.status;
 
       if (statusRetornado === 'OFICIAL' || statusRetornado === 'ENCONTRADO' || statusRetornado === 'valid') {
@@ -116,7 +126,8 @@ function CallCheckPage() {
   };
 
   const handleInputChange = (e) => {
-    const value = e.target.value.replace(/[^\d\s()-]/g, '');
+    // Permite que o usuário digite livremente números e caracteres comuns de formatação
+    const value = e.target.value.replace(/[^\d\s()+-]/g, '');
     setPhoneInput(value);
   };
 
@@ -260,7 +271,7 @@ function CallCheckPage() {
             <div className="flex flex-wrap justify-center gap-[20px]">
               {[
                 { icon: Zap, title: 'Validação em tempo real', desc: 'Verifique instantaneamente se o número está no formato correto.' },
-                { icon: CheckCircle2, title: 'Identificação ativa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
+                { icon: CheckCircle2, title: 'Identificação activa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
                 { icon: Shield, title: 'Detecção de spam', desc: 'Identifique números com formato suspeito ou incompleto.' }
               ].map((item, i) => (
                 <motion.div 
@@ -301,7 +312,7 @@ function CallCheckPage() {
                   <div className="flex-1">
                     <Input
                       type="tel"
-                      placeholder="Ex: 11987654321"
+                      placeholder="Ex: (11) 4979-3300"
                       value={phoneInput}
                       onChange={handleInputChange}
                       onKeyPress={handleKeyPress}
@@ -419,7 +430,7 @@ function CallCheckPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
-                { icon: DollarSign, title: 'Redução de custos', desc: 'Economize resources eliminando contatos inválidos antes de investir tempo neles.' },
+                { icon: DollarSign, title: 'Redução de custos', desc: 'Economize recursos eliminando contatos inválidos antes de investir tempo neles.' },
                 { icon: Users, title: 'Mais contatos reais', desc: 'Foque apenas em números válidos e aumente sua taxa de conversão significativamente.' },
                 { icon: Zap, title: 'Resultado instantâneo', desc: 'Validação em tempo real sem espera ou processamento demorado em lote.' }
               ].map((item, i) => (
