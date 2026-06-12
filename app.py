@@ -86,7 +86,9 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             telefone_limpo = limpar_telefone(telefone)
 
-            # CAMADA ADICIONAL DE SEGURANÇA: VERIFICAR DENÚNCIAS PRIMEIRO
+            # ==============================================================
+            # PASSO 1: VERIFICAÇÃO DE DENÚNCIAS (PRIORIDADE MÁXIMA)
+            # ==============================================================
             if telefone_limpo:
                 try:
                     cursor.execute("""
@@ -100,45 +102,56 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     if denuncia:
                         return {
                             "empresa": nome or "Número Desconhecido",
-                            "telefone": telefone,
+                            "telefone": formatar_numero_completo(telefone),
                             "status": "RISCO",
                             "uf": uf or "",
                             "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('descricao', 'Atividades suspeitas')}."
                         }
                 except Exception as e:
-                    print("Aviso: Tabela de denúncias ou colunas podem estar indisponíveis.", e)
+                    print("Aviso: Falha ao consultar denúncias.", e)
 
-            # ==============================================================
-            # TRATAMENTO DO DDI (55) QUE VEM DO FRONT-END
-            # ==============================================================
-            # O React adiciona "55", mas o DB pode estar sem. Vamos buscar das duas formas!
+            # Preparação das variáveis de busca
             tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
+            
+            # Limpa o nome tirando espaços e pontuações para não dar erro entre "S.A." e "SA"
+            nome_limpo_busca = "".join(filter(str.isalnum, nome)).upper() if nome else ""
+            termo_busca = f"%{nome_limpo_busca}%"
 
-            # CENÁRIO 1: BUSCA POR NOME E TELEFONE JUNTOS
+            # ==============================================================
+            # CENÁRIO 3: BUSCA POR NOME + TELEFONE
+            # ==============================================================
             if nome and telefone_limpo:
-                termo_busca = f"%{nome}%"
                 query = """
                     SELECT empresa_nome, numero, verificada
                     FROM (
-                        -- 1. Busca os telefones da base oficial
+                        -- 1. Base Oficial
                         SELECT e.nome AS empresa_nome, t.numero, e.verificada
                         FROM empresa e
                         JOIN telefone t ON t.empresa_id = e.id
-                        WHERE e.nome ILIKE %s
+                        WHERE REGEXP_REPLACE(UPPER(e.nome), '[^A-Z0-9]', '', 'g') ILIKE %s
                         
                         UNION ALL
                         
-                        -- 2. Busca os telefones da base da Receita (que antes era ignorada)
+                        -- 2. Base da Receita (Buscando no telefone 1)
                         SELECT er.nome AS empresa_nome, CAST(tr.telefone1 AS VARCHAR) AS numero, false AS verificada
                         FROM empresa_receita er
                         JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
-                        WHERE er.nome ILIKE %s
+                        WHERE REGEXP_REPLACE(UPPER(er.nome), '[^A-Z0-9]', '', 'g') ILIKE %s
+                        AND tr.telefone1 IS NOT NULL
+                        
+                        UNION ALL
+                        
+                        -- 3. Base da Receita (Buscando no telefone 2 - AQUI ESTAVA O ERRO ANTES!)
+                        SELECT er.nome AS empresa_nome, CAST(tr.telefone2 AS VARCHAR) AS numero, false AS verificada
+                        FROM empresa_receita er
+                        JOIN telefone_receita tr ON tr.cnpj_basico = er.cnpj_basico
+                        WHERE REGEXP_REPLACE(UPPER(er.nome), '[^A-Z0-9]', '', 'g') ILIKE %s
+                        AND tr.telefone2 IS NOT NULL
                     ) e
-                    -- Procura tanto o número com 55 quanto sem o 55
                     WHERE REGEXP_REPLACE(numero, '\D', '', 'g') IN (%s, %s)
                     LIMIT 1
                 """
-                cursor.execute(query, (termo_busca, termo_busca, telefone_limpo, tel_sem_55))
+                cursor.execute(query, (termo_busca, termo_busca, termo_busca, telefone_limpo, tel_sem_55))
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -147,17 +160,19 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         "telefone": formatar_numero_completo(resultado["numero"]),
                         "status": "OFICIAL" if resultado["verificada"] else "NAO_VERIFICADA",
                         "uf": uf or "",
-                        "mensagem": "Número verificado e seguro!" if resultado["verificada"] else "Número encontrado, mas a empresa não possui selo de verificação."
+                        "mensagem": "Número verificado e seguro!" if resultado["verificada"] else "Número encontrado e validado com a empresa."
                     }
                 else:
                     return {
                         "empresa": nome,
-                        "telefone": telefone,
+                        "telefone": formatar_numero_completo(telefone),
                         "status": "NAO_OFICIAL",
-                        "mensagem": "Número não consta como oficial para esta empresa."
+                        "mensagem": "Número não consta como vinculado a esta empresa."
                     }
 
-            # CENÁRIO 2: BUSCA APENAS POR TELEFONE
+            # ==============================================================
+            # CENÁRIO 1: BUSCA APENAS POR TELEFONE
+            # ==============================================================
             elif telefone_limpo and not nome:
                 cursor.execute("""
                     SELECT empresa_nome, numero, verificada
@@ -173,9 +188,16 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         FROM telefone_receita tr
                         LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
                         WHERE REGEXP_REPLACE(tr.telefone1, '\D', '', 'g') IN (%s, %s)
+                        
+                        UNION ALL
+                        
+                        SELECT er.nome AS empresa_nome, CAST(tr.telefone2 AS VARCHAR) AS numero, false AS verificada
+                        FROM telefone_receita tr
+                        LEFT JOIN empresa_receita er ON er.cnpj_basico = tr.cnpj_basico
+                        WHERE REGEXP_REPLACE(tr.telefone2, '\D', '', 'g') IN (%s, %s)
                     ) e
                     LIMIT 1
-                """, (telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55))
+                """, (telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55, telefone_limpo, tel_sem_55))
                 resultado = cursor.fetchone()
 
                 if resultado:
@@ -187,40 +209,50 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         "uf": uf or "",
                         "mensagem": "Telefone vinculado a uma empresa."
                     }
-                return {"empresa": None, "telefone": telefone, "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
+                return {"empresa": None, "telefone": formatar_numero_completo(telefone), "status": "NAO_ENCONTRADO", "mensagem": "Telefone não encontrado."}
 
-            # CENÁRIO 3: BUSCA APENAS POR NOME (PAGINADA)
+            # ==============================================================
+            # CENÁRIO 2: BUSCA APENAS POR NOME (PAGINADA)
+            # ==============================================================
             elif nome:
                 por_pagina = 10
                 offset = (pagina - 1) * por_pagina
-                termo_busca = f"%{nome}%"
+                
+                # Para listar não somos tão restritivos com a remoção de caracteres, 
+                # usamos o padrão normal com % para permitir que o ILIKE faça o seu trabalho
+                termo_busca_lista = f"%{nome}%" 
                 
                 cursor.execute("""
-                    SELECT id, nome, verificada, 'base_empresa' AS origem, CAST(NULL AS VARCHAR) AS telefone
+                    SELECT id, nome, verificada, 'base_empresa' AS origem, CAST(NULL AS VARCHAR) AS tel1, CAST(NULL AS VARCHAR) AS tel2
                     FROM empresa
                     WHERE nome ILIKE %s
                     
                     UNION ALL
                     
-                    SELECT empresa_receita.id, empresa_receita.nome, false AS verificada, 'receita' AS origem, CAST(telefone_receita.telefone1 AS VARCHAR) AS telefone
+                    SELECT empresa_receita.id, empresa_receita.nome, false AS verificada, 'receita' AS origem, 
+                           CAST(telefone_receita.telefone1 AS VARCHAR) AS tel1, 
+                           CAST(telefone_receita.telefone2 AS VARCHAR) AS tel2
                     FROM empresa_receita
                     LEFT JOIN telefone_receita ON telefone_receita.cnpj_basico = empresa_receita.cnpj_basico
-                    WHERE empresa_receita.nome ILIKE %s OR telefone_receita.telefone1 ILIKE %s
+                    WHERE empresa_receita.nome ILIKE %s 
                     
                     ORDER BY nome ASC 
                     LIMIT %s OFFSET %s
-                """, (termo_busca, termo_busca, termo_busca, por_pagina + 1, offset))
+                """, (termo_busca_lista, termo_busca_lista, por_pagina + 1, offset))
                 
                 empresas = cursor.fetchall()
                 tem_proxima = len(empresas) > por_pagina
                 
                 lista_resultados = []
                 for emp in empresas[:por_pagina]:
+                    telefones = []
+                    
                     if emp['origem'] == 'base_empresa':
                         cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (emp['id'],))
-                        telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall()]
+                        telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall() if row['numero']]
                     else:
-                        telefones = [formatar_numero_completo(emp['telefone'])] if emp.get('telefone') else []
+                        if emp.get('tel1'): telefones.append(formatar_numero_completo(emp['tel1']))
+                        if emp.get('tel2'): telefones.append(formatar_numero_completo(emp['tel2']))
                     
                     lista_resultados.append({
                         "empresa": emp["nome"], 
@@ -240,7 +272,8 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             return {"status": "ERRO", "mensagem": "Informe nome ou telefone."}
 
         except Exception as e:
-            return {"status": "ERRO", "mensagem": str(e)}
+            print("Erro detalhado no banco de dados:", str(e))
+            return {"status": "ERRO", "mensagem": "Falha na comunicação com o banco de dados."}
 
 # =========================================================================
 # NOVA ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT
