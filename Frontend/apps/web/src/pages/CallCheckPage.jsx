@@ -34,7 +34,7 @@ const RippleButton = ({ children, className, onClick, ...props }) => {
       ref={buttonRef}
       onClick={handleClick}
       className={`ripple-container relative overflow-hidden transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 ${className}`}
-      ...props
+      {...props}
     >
       {children}
       {ripples.map((ripple) => (
@@ -61,11 +61,9 @@ function CallCheckPage() {
   const [mensagemBackend, setMensagemBackend] = useState(''); 
   const [dadosCompletos, setDadosCompletos] = useState(null); 
   
-  // 🌟 NOVO: Estados para controlar a paginação no React
   const [currentPage, setCurrentPage] = useState(1);
   const [temProxima, setTemProxima] = useState(false);
 
-  // Alterado para receber a página desejada (padrão é 1 para novas buscas)
   const handleValidation = async (pageToFetch = 1) => {
     if (!phoneInput && !companyInput) return;
     
@@ -74,7 +72,6 @@ function CallCheckPage() {
     setMensagemBackend(''); 
     setDadosCompletos(null); 
 
-    // --- Normalização do número se ele foi digitado ---
     let telefoneLimpo = '';
     if (phoneInput) {
       telefoneLimpo = phoneInput.replace(/\D/g, '');
@@ -88,7 +85,6 @@ function CallCheckPage() {
     }
 
     try {
-      // Chama a sua API Flask enviando os campos e a página atual do fluxo
       const response = await fetch('https://callcheck.onrender.com/api/validar', {
         method: 'POST',
         headers: {
@@ -97,7 +93,7 @@ function CallCheckPage() {
         body: JSON.stringify({ 
           telefone: telefoneLimpo || null, 
           empresa: companyInput.trim() || null,
-          pagina: pageToFetch // 🌟 ENVIANDO A PÁGINA PARA O BACKEND
+          pagina: pageToFetch
         }) 
       });
 
@@ -111,7 +107,6 @@ function CallCheckPage() {
 
       const statusRetornado = dados.status || dadosDoObjeto.status;
 
-      // 🌟 SALVANDO O RETORNO DA PAGINAÇÃO DO BACKEND
       setCurrentPage(dados.pagina_atual || dadosDoObjeto.pagina_atual || pageToFetch);
       setTemProxima(dados.tem_proxima || dadosDoObjeto.tem_proxima || false);
 
@@ -134,7 +129,7 @@ function CallCheckPage() {
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
-      handleValidation(1); // Nova busca começa na página 1
+      handleValidation(1);
     }
   };
 
@@ -143,7 +138,6 @@ function CallCheckPage() {
     setPhoneInput(value);
   };
 
-  // Framer Motion Variants
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -279,7 +273,7 @@ function CallCheckPage() {
             <div className="flex flex-wrap justify-center gap-[20px]">
               {[
                 { icon: Zap, title: 'Validação em tempo real', desc: 'Verifique instantaneamente se o número está no formato correto.' },
-                { icon: CheckCircle2, title: 'Identificação activa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
+                { icon: CheckCircle2, title: 'Identificação ativa', desc: 'Confirme que o telefone possui a quantidade correta de dígitos.' },
                 { icon: Shield, title: 'Detecção de spam', desc: 'Identifique números com formato suspeito ou incompleto.' }
               ].map((item, i) => (
                 <div 
@@ -344,7 +338,7 @@ function CallCheckPage() {
                   </div>
 
                   <RippleButton 
-                    onClick={() => handleValidation(1)} // Começa da página 1 em nova busca
+                    onClick={() => handleValidation(1)}
                     disabled={isValidating || (!phoneInput && !companyInput)}
                     className="bg-[#22C55E] hover:bg-[#22C55E] text-white font-semibold h-14 rounded-xl hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none mt-2 flex items-center justify-center text-lg w-full"
                   >
@@ -386,7 +380,6 @@ function CallCheckPage() {
                             </div>
                           ))}
 
-                          {/* 🌟 NOVOS BOTÕES DE PAGINAÇÃO VISUAIS (Aparecem dentro do card de sucesso) */}
                           {(temProxima || currentPage > 1) && (
                             <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-white/10 w-full">
                               {currentPage > 1 && (
