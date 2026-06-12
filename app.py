@@ -218,7 +218,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             return {"status": "ERRO", "mensagem": str(e)}
 
 # =========================================================================
-# NOVA ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT (NÃO MEXE NAS OUTRAS)
+# NOVA ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT
 # =========================================================================
 @app.route("/api/validar", methods=["POST"])
 def api_validar_telefone():
@@ -241,25 +241,31 @@ def api_validar_telefone():
     if not isinstance(pagina, int):
         pagina = 1
 
-    # Executa exatamente a sua função interna de banco de dados
+    # Executa a função interna de banco de dados
     resposta_db = verificar_empresa(nome, telefone, pagina, uf)
     
-    # Se a busca foi por texto e gerou uma estrutura de LISTA, tratamos para o card único do front-end
+    # Se a busca foi por texto e gerou uma LISTA, adaptamos TODOS os itens para o React
     if resposta_db.get("status") == "LISTA":
         resultados = resposta_db.get("resultados", [])
         if resultados:
-            primeiro_registro = resultados[0]
-            lista_tels = primeiro_registro.get("telefones", [])
-            tel_exibir = lista_tels[0] if lista_tels else "Não informado"
+            dados_adaptados = []
             
-            # Reconstrói os dados de forma compatível com a CallCheckPage.jsx
-            dados_adaptados = {
-                "status": "ENCONTRADO",
-                "empresa": primeiro_registro.get("empresa"),
-                "telefone": tel_exibir,
-                "mensagem": f"✅ Registro encontrado com sucesso!"
-            }
-            return jsonify({"status": "valid", "dados": dados_adaptados})
+            # Varre todos os resultados encontrados em vez de pegar só o [0]
+            for reg in resultados:
+                lista_tels = reg.get("telefones", [])
+                tel_exibir = lista_tels[0] if lista_tels else "Não informado"
+                
+                dados_adaptados.append({
+                    "empresa": reg.get("empresa"),
+                    "telefone": tel_exibir,
+                    "status": "ENCONTRADO"
+                })
+                
+            return jsonify({
+                "status": "valid", 
+                "mensagem": f"✅ {len(dados_adaptados)} registros encontrados!",
+                "dados": dados_adaptados # Agora estamos enviando a lista inteira (Array)
+            })
         else:
             return jsonify({
                 "status": "invalid", 
@@ -277,7 +283,6 @@ def api_validar_telefone():
     else:
         # Casos NAO_OFICIAL, NAO_ENCONTRADO ou erros internos
         return jsonify({"status": "invalid", "dados": resposta_db})
-
 # =========================
 # ROTAS PÚBLICAS E DENÚNCIAS
 # =========================
