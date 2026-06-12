@@ -34,7 +34,7 @@ const RippleButton = ({ children, className, onClick, ...props }) => {
       ref={buttonRef}
       onClick={handleClick}
       className={`ripple-container relative overflow-hidden transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 ${className}`}
-      {...props}
+      ...props}
     >
       {children}
       {ripples.map((ripple) => (
@@ -368,15 +368,19 @@ function CallCheckPage() {
                         <span className="text-lg font-bold">{mensagemBackend || "✅ Canal Oficial Identificado"}</span>
                       </div>
                       {dadosCompletos && (
-                        <div className="mt-2 pl-9 text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#22C55E]/20">
-                          <div className="flex items-center gap-2 text-white font-medium">
-                            <Building2 className="w-4 h-4 text-[#22C55E]" />
-                            <span>Empresa: {dadosCompletos.empresa || dadosCompletos.nome_empresa || "Nome indisponível"}</span>
-                          </div>
-                          <div className="text-sm text-gray-400 flex items-center gap-1.5">
-                            <Phone className="w-3.5 h-3.5 text-gray-500" />
-                            <span>Telefone Vinculado: {dadosCompletos.telefone || phoneInput || "Não informado"}</span>
-                          </div>
+                        <div className="mt-2 pl-9 w-full flex flex-col gap-3">
+                          {(Array.isArray(dadosCompletos) ? dadosCompletos : [dadosCompletos]).map((item, index) => (
+                            <div key={index} className="text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#22C55E]/20">
+                              <div className="flex items-center gap-2 text-white font-medium">
+                                <Building2 className="w-4 h-4 text-[#22C55E]" />
+                                <span>Empresa: {item.empresa || item.nome_empresa || "Nome indisponível"}</span>
+                              </div>
+                              <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                                <Phone className="w-3.5 h-3.5 text-gray-500" />
+                                <span>Telefone Vinculado: {item.telefone || phoneInput || "Não informado"}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </motion.div>
@@ -392,17 +396,21 @@ function CallCheckPage() {
                         <span className="text-lg font-bold">{mensagemBackend || "⚠️ Atenção: Registros com Alertas"}</span>
                       </div>
                       {dadosCompletos && (
-                        <div className="mt-2 pl-9 text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#F59E0B]/20">
-                          {(dadosCompletos.empresa || dadosCompletos.nome_empresa) && (
-                            <div className="flex items-center gap-2 text-white font-medium">
-                              <Building2 className="w-4 h-4 text-[#F59E0B]" />
-                              <span>Suposta Empresa: {dadosCompletos.empresa || dadosCompletos.nome_empresa}</span>
+                        <div className="mt-2 pl-9 w-full flex flex-col gap-3">
+                          {(Array.isArray(dadosCompletos) ? dadosCompletos : [dadosCompletos]).map((item, index) => (
+                            <div key={index} className="text-gray-300 space-y-1 text-base bg-white/5 p-3 rounded-lg w-full border border-[#F59E0B]/20">
+                              {(item.empresa || item.nome_empresa) && (
+                                <div className="flex items-center gap-2 text-white font-medium">
+                                  <Building2 className="w-4 h-4 text-[#F59E0B]" />
+                                  <span>Suposta Empresa: {item.empresa || item.nome_empresa}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 text-sm text-red-400 font-semibold bg-red-500/10 p-2 rounded border border-red-500/20 mt-1">
+                                <MessageSquareWarning className="w-4 h-4" />
+                                <span>Status: {item.denuncias || "Este canal possui denúncias ou atividades não autorizadas."}</span>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex items-center gap-2 text-sm text-red-400 font-semibold bg-red-500/10 p-2 rounded border border-red-500/20 mt-1">
-                            <MessageSquareWarning className="w-4 h-4" />
-                            <span>Status: {dadosCompletos.denuncias || "Este canal possui denúncias ou atividades não autorizadas."}</span>
-                          </div>
+                          ))}
                         </div>
                       )}
                     </motion.div>
@@ -517,4 +525,3 @@ function CallCheckPage() {
 }
 
 export default CallCheckPage;
-// DEALKIS
