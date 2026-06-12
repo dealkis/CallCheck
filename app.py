@@ -177,9 +177,10 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     
                     UNION ALL
                     
-                    SELECT id, nome, false AS verificada, 'receita' AS origem, CAST(telefone_receitas AS VARCHAR) AS telefone
+                    SELECT empresa_receita.id, empresa_receita.nome, false AS verificada, 'receita' AS origem, CAST(telefone_receita.telefone_receita AS VARCHAR) AS telefone
                     FROM empresa_receita
-                    WHERE nome ILIKE %s OR telefone_receitas ILIKE %s
+                    LEFT JOIN telefone_receita ON telefone_receita.empresa_receita_id = empresa_receita.id
+                    WHERE empresa_receita.nome ILIKE %s OR telefone_receita.telefone_receita ILIKE %s
                     
                     ORDER BY nome ASC 
                     LIMIT %s OFFSET %s
@@ -532,7 +533,7 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 '''
- _____  ______     _     _      __ __ ______ ______ 
+ _____  ______     _     _       __ __ ______ ______ 
 |  __ \|  ____|   /\    | |    | |/ /|_   _|/ ____|
 | |  | | |__     /  \   | |    | ' /   | | | (___  
 | |  | |  __|   / /\ \  | |    |  <    | |  \___ \ 
