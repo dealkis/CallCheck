@@ -401,7 +401,7 @@ function CallCheckPage() {
                             >
                               Próxima ➡️
                             </Button>
-                          </div>
+                          </div> }
                               
                               <span className="text-gray-400 text-sm font-medium">
                                 Página {currentPage}
