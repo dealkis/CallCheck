@@ -98,7 +98,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             if telefone_limpo:
                 try:
                     cursor.execute("""
-                        SELECT d.descricao 
+                        SELECT d.tipo, d.descricao 
                         FROM denuncia d
                         JOIN telefone t ON d.telefone_id = t.id
                         WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s 
@@ -106,12 +106,16 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     """, (telefone_limpo,))
                     denuncia = cursor.fetchone()
                     if denuncia:
+                        desc = denuncia.get('descricao')
+                        if not desc:
+                            desc = denuncia.get('tipo', 'Atividades suspeitas')
+                            
                         return {
                             "empresa": nome or "Número Desconhecido",
                             "telefone": formatar_numero_completo(telefone),
                             "status": "RISCO",
                             "uf": uf or "",
-                            "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('descricao', 'Atividades suspeitas')}."
+                            "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {desc}."
                         }
                 except Exception as e:
                     print("Aviso: Falha ao consultar denúncias.", e)
@@ -250,12 +254,12 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 lista_resultados = []
                 for emp in empresas[:por_pagina]:
                     telefones = []
-                    denuncia_msg = None # Nova variável para guardar se achou denúncia
+                    denuncia_msg = None 
                     
                     if emp['origem'] == 'base_empresa':
-                        # Alterado para fazer JOIN com a tabela denúncia
+                        # Alterado para checar tipo e descricao
                         cursor.execute("""
-                            SELECT t.numero, d.descricao 
+                            SELECT t.numero, d.tipo, d.descricao 
                             FROM telefone t
                             LEFT JOIN denuncia d ON d.telefone_id = t.id
                             WHERE t.empresa_id = %s
@@ -264,8 +268,11 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         for row in cursor.fetchall():
                             if row['numero']:
                                 telefones.append(formatar_numero_completo(row['numero']))
-                            if row['descricao'] and not denuncia_msg:
-                                denuncia_msg = f"Motivo: {row['descricao']}"
+                            # O bug estava aqui: verificar apenas descricao.
+                            # Se a pessoa enviou denuncia sem descricao, ela era ignorada.
+                            if row['tipo'] is not None and not denuncia_msg:
+                                desc = row['descricao'] if row['descricao'] else row['tipo']
+                                denuncia_msg = f"Motivo: {desc}"
                     else:
                         if emp.get('tel1'): telefones.append(formatar_numero_completo(emp['tel1']))
                         if emp.get('tel2'): telefones.append(formatar_numero_completo(emp['tel2']))
@@ -343,7 +350,8 @@ def api_validar_telefone():
                 })
                 
             # O "Pulo do Gato": Se achou denúncia em ALGUÉM da lista, a tela inteira fica amarela (risco)
-            status_global = "risco" if tem_denuncia_na_lista else "valid"
+            # Ajustado para retornar em UPPERCASE e evitar cair na checagem de "invalid" do Front
+            status_global = "RISCO" if tem_denuncia_na_lista else "ENCONTRADO"
             msg_global = "⚠️ Atenção: Encontramos registros com alertas vinculados a esta empresa!" if tem_denuncia_na_lista else f"✅ {len(dados_adaptados)} registros encontrados!"
             
             return jsonify({
