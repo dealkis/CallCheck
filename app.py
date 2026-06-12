@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify # <-- Injetado jsonify aqui
+from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
@@ -7,7 +8,7 @@ import os
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
-
+CORS(app)
 # =========================
 # CONEXÃO COM POOL DE CONEXÕES
 # =========================
@@ -203,6 +204,33 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
         except Exception as e:
             return {"status": "ERRO", "mensagem": str(e)}
 
+# =========================================================================
+# NOVA ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT (NÃO MEXE NAS OUTRAS)
+# =========================================================================
+@app.route("/api/validar", methods=["POST"])
+def api_validar_telefone():
+    dados = request.get_json()
+    
+    if not dados:
+        return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado"}), 400
+        
+    nome = dados.get("nome", "").strip()
+    telefone = dados.get("telefone", "").strip()
+    uf = dados.get("uf", "").strip()
+    pagina = dados.get("pagina", 1)
+
+    # Executa exatamente a sua função interna de banco de dados
+    resposta_db = verificar_empresa(nome, telefone, pagina, uf)
+    
+    # Mapeia as suas respostas estruturadas para o formato simples esperado pela CallCheckPage.jsx
+    if resposta_db.get("status") in ["OFICIAL", "ENCONTRADO"]:
+        return jsonify({"status": "valid", "dados": resposta_db})
+    elif resposta_db.get("status") == "RISCO":
+        return jsonify({"status": "invalid", "dados": resposta_db})
+    else:
+        # Casos NAO_OFICIAL, NAO_ENCONTRADO ou erros internos
+        return jsonify({"status": "invalid", "dados": resposta_db})
+
 # =========================
 # ROTAS PÚBLICAS E DENÚNCIAS
 # =========================
@@ -281,7 +309,7 @@ def login():
     if "usuario_logado" in session: return redirect(url_for('perfil_usuario'))
     erro = None
     if request.method == "POST":
-        email_login = request.form.get("usuario") # Capturamos do mesmo campo name="usuario" no template
+        usuario_input = request.form.get("usuario") # Capturamos do mesmo campo name="usuario" no template
         senha = request.form.get("senha")
         
         with conectar() as conn:
@@ -294,7 +322,7 @@ def login():
                         FROM usuario 
                         WHERE email = %s AND senha = %s 
                         LIMIT 1
-                    """, (email_login, senha))
+                    """, (usuario_input, senha))
                     user = cursor.fetchone()
                     
                     if user:
@@ -458,11 +486,11 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 '''
-_____  ______          _      _  __ _____  _____ 
-|  __ \|  ____|   /\   | |    | |/ /|_   _|/ ____|
-| |  | | |__     /  \  | |    | ' /   | | | (___  
-| |  | |  __|   / /\ \ | |    |  <    | |  \___ \ 
-| |__| | |____ / ____ \| |____| . \  _| |_ ____) |
-|_____/|______/_/    \_\______|_|\_\|_____|_____/
+ _____  ______      _     _      __ __ ______ ______ 
+|  __ \|  ____|    /\    | |    | |/ /|_   _|/ ____|
+| |  | | |__      /  \   | |    | ' /   | | | (___  
+| |  | |  __|    / /\ \  | |    |  <    | |  \___ \ 
+| |__| | |____  / ____ \ | |____| . \  _| |_ ____) |
+|_____/|______|/_/    \_\______|_|\_\|_____|_____/
 
 '''
