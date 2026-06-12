@@ -67,8 +67,8 @@ function CallCheckPage() {
     setMensagemBackend(''); // Limpa mensagens anteriores
 
     try {
-      // Chama a sua API Flask (lembre-se de rodar o Flask na porta 5000)
-      const response = await fetch('http://127.0.0.1:5000/api/verificar', {
+      // Chama a sua API Flask hospedada no Render
+      const response = await fetch('https://callcheck.onrender.com/api/validar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -80,12 +80,16 @@ function CallCheckPage() {
       const dados = await response.json();
       
       // Guarda a mensagem que veio do seu banco de dados
-      setMensagemBackend(dados.mensagem);
+      // Suporta tanto o formato direto quanto o formato aninhado (dados.dados)
+      const mensagemRetornada = dados.mensagem || (dados.dados && dados.dados.mensagem) || '';
+      setMensagemBackend(mensagemRetornada);
 
       // Define a cor/ícone baseado no status que o seu Python retornou
-      if (dados.status === 'OFICIAL' || dados.status === 'ENCONTRADO') {
+      const statusRetornado = dados.status || (dados.dados && dados.dados.status);
+
+      if (statusRetornado === 'OFICIAL' || statusRetornado === 'ENCONTRADO' || statusRetornado === 'valid') {
         setValidationResult('valid');
-      } else if (dados.status === 'RISCO') {
+      } else if (statusRetornado === 'RISCO' || (dados.dados && dados.dados.status === 'RISCO')) {
         setValidationResult('risco'); // Novo status para números denunciados
       } else {
         setValidationResult('invalid'); // NAO_OFICIAL, NAO_ENCONTRADO ou ERRO
@@ -94,7 +98,7 @@ function CallCheckPage() {
     } catch (error) {
       console.error("Erro na comunicação com o backend:", error);
       setValidationResult('invalid');
-      setMensagemBackend('Erro de conexão com o servidor. Verifique se o Flask está rodando.');
+      setMensagemBackend('Erro de conexão com o servidor. Verifique se o backend está rodando.');
     } finally {
       setIsValidating(false);
     }
@@ -442,3 +446,4 @@ function CallCheckPage() {
 }
 
 export default CallCheckPage;
+// DEALKIS
