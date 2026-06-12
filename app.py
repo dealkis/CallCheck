@@ -177,7 +177,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                     
                     UNION ALL
                     
-                    SELECT id, nome, false AS verificada, 'receita' AS origem, CAST(telefone_receita AS VARCHAR) AS telefone
+                    SELECT id, nome, false AS verificada, 'receita' AS origem, CAST(telefone_receitas AS VARCHAR) AS telefone
                     FROM empresa_receita
                     WHERE nome ILIKE %s OR telefone_receita ILIKE %s
                     
