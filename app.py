@@ -9,6 +9,7 @@ import os
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
 CORS(app, resources={r"/api/*": {"origins": "https://callcheck-1.onrender.com"}})
+
 # =========================
 # CONEXÃO COM POOL DE CONEXÕES
 # =========================
@@ -86,7 +87,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             telefone_limpo = limpar_telefone(telefone)
 
             # CAMADA ADICIONAL DE SEGURANÇA: VERIFICAR DENÚNCIAS PRIMEIRO
-            # Agora utilizando JOIN entre a tabela 'denuncia' e 'telefone'
             if telefone_limpo:
                 try:
                     cursor.execute("""
@@ -102,7 +102,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                             "empresa": nome or "Número Desconhecido",
                             "telefone": telefone,
                             "status": "RISCO",
-                            "uf": uf or "",  # UF é retornado para compatibilidade com o front, mas não é usado na DB
+                            "uf": uf or "",
                             "mensagem": f"ALERTA: Este número possui denúncias registradas! Motivo: {denuncia.get('descricao', 'Atividades suspeitas')}."
                         }
                 except Exception as e:
@@ -113,13 +113,16 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 termo_busca = f"%{nome}%"
                 query = """
                     SELECT e.nome AS empresa_nome, t.numero, e.verificada
-                    FROM empresa e
-                    JOIN telefone t ON t.empresa_id = e.id
+                    FROM (
+                        SELECT id, nome, verificada, 'base_empresa' AS origem FROM empresa
+                        UNION ALL
+                        SELECT id, nome, false AS verificada, 'receita' AS origem FROM empresa_receita
+                    ) e
+                    JOIN telefone t ON t.empresa_id = e.id AND e.origem = 'base_empresa'
                     WHERE e.nome ILIKE %s 
                       AND REGEXP_REPLACE(t.numero, '\D', '', 'g') = %s
                     LIMIT 1
                 """
-                # Observação: Filtragem de UF foi removida conforme a nova modelagem relacional
                 cursor.execute(query, (termo_busca, telefone_limpo))
                 resultado = cursor.fetchone()
 
@@ -168,21 +171,30 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                 termo_busca = f"%{nome}%"
                 
                 cursor.execute("""
-                    SELECT e.id, e.nome, e.verificada
-                    FROM empresa e
-                    WHERE e.nome ILIKE %s
-                    ORDER BY e.nome ASC 
+                    SELECT id, nome, verificada, 'base_empresa' AS origem
+                    FROM empresa
+                    WHERE nome ILIKE %s
+                    
+                    UNION ALL
+                    
+                    SELECT id, nome, false AS verificada, 'receita' AS origem
+                    FROM empresa_receita
+                    WHERE nome ILIKE %s
+                    
+                    ORDER BY nome ASC 
                     LIMIT %s OFFSET %s
-                """, (termo_busca, por_pagina + 1, offset))
+                """, (termo_busca, termo_busca, por_pagina + 1, offset))
                 
                 empresas = cursor.fetchall()
                 tem_proxima = len(empresas) > por_pagina
                 
                 lista_resultados = []
                 for emp in empresas[:por_pagina]:
-                    # Agora os telefones da empresa precisam ser buscados pelo INNER JOIN / chave estrangeira
-                    cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (emp['id'],))
-                    telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall()]
+                    if emp['origem'] == 'base_empresa':
+                        cursor.execute("SELECT numero FROM telefone WHERE empresa_id = %s", (emp['id'],))
+                        telefones = [formatar_numero_completo(row['numero']) for row in cursor.fetchall()]
+                    else:
+                        telefones = [] # Registros da Receita Federal geralmente não possuem telefone vinculado nesta estrutura de BD
                     
                     lista_resultados.append({
                         "empresa": emp["nome"], 
@@ -520,11 +532,11 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 '''
- _____  ______      _     _      __ __ ______ ______ 
-|  __ \|  ____|    /\    | |    | |/ /|_   _|/ ____|
-| |  | | |__      /  \   | |    | ' /   | | | (___  
-| |  | |  __|    / /\ \  | |    |  <    | |  \___ \ 
-| |__| | |____  / ____ \ | |____| . \  _| |_ ____) |
+ _____  ______     _     _      __ __ ______ ______ 
+|  __ \|  ____|   /\    | |    | |/ /|_   _|/ ____|
+| |  | | |__     /  \   | |    | ' /   | | | (___  
+| |  | |  __|   / /\ \  | |    |  <    | |  \___ \ 
+| |__| | |____ / ____ \ | |____| . \  _| |_ ____) |
 |_____/|______|/_/    \_\______|_|\_\|_____|_____/
 
 '''
