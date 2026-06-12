@@ -367,48 +367,68 @@ def index():
             resultado = verificar_empresa(nome, telefone, pagina, uf)
     return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
 
-@app.route("/denunciar", methods=["POST"])
-def enviar_denuncia():
-    telefone = request.form.get("telefone", "").strip()
-    motivo = request.form.get("motivo", "").strip()
-    telefone_limpo = limpar_telefone(telefone)
+# =========================================================================
+# NOVA ROTA PARA RECEBER DENÚNCIAS DO FRONTEND EM REACT
+# =========================================================================
+@app.route("/api/denuncias", methods=["POST"])
+def api_registrar_denuncia():
+    dados = request.get_json()
+    
+    if not dados:
+        return jsonify({"status": "ERRO", "mensagem": "Nenhum dado enviado"}), 400
+        
+    telefone_bruto = dados.get("telefone", "")
+    tipo = dados.get("tipo", "") # Ex: GOLPE, SPAM, FALSO_ATENDIMENTO
+    descricao = dados.get("descricao", "")
+    
+    telefone_limpo = limpar_telefone(telefone_bruto)
+    
+    if not telefone_limpo or not tipo:
+        return jsonify({"status": "ERRO", "mensagem": "Telefone e tipo de ocorrência são obrigatórios"}), 400
 
-    if telefone_limpo:
-        with conectar() as conn:
-            if conn:
-                try:
-                    cursor = conn.cursor() # Usamos o cursor padrão aqui
-                    
-                    # 1. Verifica se telefone existe na base 'telefone'
-                    cursor.execute("""
-                        SELECT id FROM telefone 
-                        WHERE REGEXP_REPLACE(numero, '\D', '', 'g') = %s 
-                        LIMIT 1
-                    """, (telefone_limpo,))
-                    tel_row = cursor.fetchone()
-                    
-                    if tel_row:
-                        telefone_id = tel_row[0]
-                    else:
-                        # 2. Insere telefone se não existir (desconhecido, como suspeito)
-                        cursor.execute("""
-                            INSERT INTO telefone (numero, tipo, suspeito, principal) 
-                            VALUES (%s, 'desconhecido', true, false) 
-                            RETURNING id
-                        """, (telefone,)) 
-                        telefone_id = cursor.fetchone()[0]
-                    
-                    # 3. Insere a nova denúncia usando a chave estrangeira
-                    cursor.execute("""
-                        INSERT INTO denuncia (telefone_id, tipo, descricao) 
-                        VALUES (%s, 'outros', %s)
-                    """, (telefone_id, motivo))
-                    
-                    conn.commit()
-                except Exception as e:
-                    print("Erro ao salvar denúncia:", e)
-
-    return redirect(url_for('index', telefone=telefone))
+    with conectar() as conn:
+        if not conn:
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão ao banco de dados"}), 500
+        try:
+            cursor = conn.cursor()
+            
+            # 1. Verifica se o telefone já existe na base
+            cursor.execute("""
+                SELECT id FROM telefone 
+                WHERE REGEXP_REPLACE(numero, '\D', '', 'g') = %s 
+                LIMIT 1
+            """, (telefone_limpo,))
+            tel_row = cursor.fetchone()
+            
+            if tel_row:
+                telefone_id = tel_row[0]
+            else:
+                # 2. Se não existir, insere como desconhecido e suspeito
+                cursor.execute("""
+                    INSERT INTO telefone (numero, tipo, suspeito, principal) 
+                    VALUES (%s, 'desconhecido', true, false) 
+                    RETURNING id
+                """, (telefone_bruto,)) 
+                telefone_id = cursor.fetchone()[0]
+            
+            # 3. Insere a denúncia vinculada a esse telefone
+            # (usuario_id vai nulo por enquanto, já que é uma denúncia pública)
+            cursor.execute("""
+                INSERT INTO denuncia (telefone_id, tipo, descricao) 
+                VALUES (%s, %s, %s)
+            """, (telefone_id, tipo, descricao))
+            
+            conn.commit()
+            return jsonify({"status": "SUCESSO", "mensagem": "Denúncia registrada no banco com sucesso!"}), 200
+            
+        except psycopg2.IntegrityError as e:
+            conn.rollback()
+            # Pode cair aqui se a constraint 'unica_denuncia_por_usuario' barrar (mesmo usuário denunciando mesmo número)
+            return jsonify({"status": "ERRO", "mensagem": "Denúncia já registrada para este número."}), 409
+        except Exception as e:
+            conn.rollback()
+            print("Erro detalhado ao salvar denúncia via API:", e)
+            return jsonify({"status": "ERRO", "mensagem": "Erro interno ao salvar no banco."}), 500
 
 @app.route("/sobre")
 def sobre():
