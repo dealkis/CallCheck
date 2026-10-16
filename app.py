@@ -9,7 +9,7 @@ import re
 import unicodedata
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
+app.secret_key = os.getenv("SECRET_KEY", "chave_desenvolvimento_local")
 CORS(app, resources={r"/api/*": {"origins": "https://callcheck-1.onrender.com"}})
 
 # =========================
@@ -17,7 +17,7 @@ CORS(app, resources={r"/api/*": {"origins": "https://callcheck-1.onrender.com"}}
 # =========================
 MIN_CONNS = 1
 MAX_CONNS = 20
-DB_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_o51wyEXnCMpg@ep-plain-morning-ac3tue24-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+DB_URL = os.getenv("DATABASE_URL", "sqlite:///banco_local.db")
 
 pool = None
 try:
@@ -648,12 +648,3 @@ def database_view():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-'''
- _____  ______     _     _       __ __ ______ ______ 
-|  __ \|  ____|   /\    | |     | |/ /|_   _|/ ____|
-| |  | | |__     /  \   | |     | ' /   | | | (___  
-| |  | |  __|   / /\ \  | |     |  <    | |  \___ \ 
-| |__| | |____ / ____ \ | |____| . \  _| |_ ____) |
-|_____/|______|/_/    \_\______|_|\_\|_____|_____/
-
-'''
