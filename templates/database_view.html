@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero" style="padding: 20px 0;">
+    <h1>Visualização do Banco de Dados</h1>
+    <p>Exibindo os primeiros 100 registros da tabela <code>estabelecimentos_raw</code></p>
+</section>
+
+<div style="width: 95%; margin: 20px auto; overflow-x: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+    
+    <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: bold; color: #555;">Tabela: PostgreSQL (Render.com)</span>
+        <a href="/usuario" style="text-decoration: none; color: #007bff;">← Voltar ao Painel</a>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.9em;">
+        <thead>
+            <tr style="background-color: #2c3e50; color: white; text-align: left;">
+                <th style="padding: 12px; border: 1px solid #ddd;">CNPJ BASE</th>
+                <th style="padding: 12px; border: 1px solid #ddd;">NOME FANTASIA</th>
+                <th style="padding: 12px; border: 1px solid #ddd;">DDD</th>
+                <th style="padding: 12px; border: 1px solid #ddd;">TELEFONE</th>
+                <th style="padding: 12px; border: 1px solid #ddd;">UF</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reg in registros %}
+            <tr style="border-bottom: 1px solid #eee; background-color: {% if loop.index % 2 == 0 %}#fdfdfd{% else %}#fff{% endif %};">
+                <td style="padding: 10px; border: 1px solid #eee;">{{ reg.cnpj_base }}</td>
+                <td style="padding: 10px; border: 1px solid #eee; font-weight: bold;">{{ reg.nome_fantasia }}</td>
+                <td style="padding: 10px; border: 1px solid #eee;">{{ reg.ddd1 }}</td>
+                <td style="padding: 10px; border: 1px solid #eee;">{{ reg.telefone1 }}</td>
+                <td style="padding: 10px; border: 1px solid #eee;">{{ reg.uf }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not registros %}
+    <p style="text-align: center; padding: 20px; color: #888;">Nenhum dado encontrado no banco.</p>
+    {% endif %}
+</div>
+{% endblock %}
