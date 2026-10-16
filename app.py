@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, g
 from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -7,6 +7,10 @@ from contextlib import contextmanager
 import os
 import re
 import unicodedata
+import secrets
+import hashlib
+from functools import wraps
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
@@ -429,6 +433,252 @@ def api_registrar_denuncia():
                 "status": "ERRO", 
                 "mensagem": f"Falha interna no banco de dados: {str(e)}"
             }), 500
+
+# =========================================================================
+# AUTENTICAÇÃO (LOGIN + SESSÃO NO BANCO) E ÁREA ADMINISTRATIVA
+# =========================================================================
+SESSAO_VALIDADE_SEGUNDOS = 60 * 60 * 8  # 8 horas
+# Hash descartável: iguala o tempo de resposta quando o e-mail não existe (evita enumeração de usuários)
+_HASH_FALSO = generate_password_hash("senha-falsa")
+
+
+def _erro(mensagem, codigo):
+    return jsonify({"status": "ERRO", "mensagem": mensagem}), codigo
+
+
+def _ip_cliente():
+    encaminhado = request.headers.get("X-Forwarded-For", "")
+    ip = encaminhado.split(",")[0].strip() if encaminhado else (request.remote_addr or "")
+    return ip[:45]
+
+
+def _hash_token(token):
+    # No banco fica só o SHA-256 do token: um vazamento da tabela não expõe sessões válidas
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _token_do_request():
+    cabecalho = request.headers.get("Authorization", "")
+    return cabecalho[7:].strip() if cabecalho.startswith("Bearer ") else None
+
+
+def variantes_telefone(tel):
+    """Gera as formas equivalentes de um número (com/sem 55) para comparar com o banco."""
+    limpo = limpar_telefone(tel)
+    if not limpo:
+        return []
+    sem_55 = limpo[2:] if limpo.startswith("55") else limpo
+    return list({limpo, sem_55, "55" + sem_55})
+
+
+def senha_confere(hash_armazenado, senha):
+    h = hash_armazenado or ""
+    try:
+        if h.startswith("$2"):  # bcrypt (só funciona se o pacote 'bcrypt' estiver instalado)
+            import bcrypt
+            return bcrypt.checkpw(senha.encode(), h.encode())
+        return check_password_hash(h, senha)  # werkzeug: scrypt / pbkdf2
+    except Exception as e:
+        print("Aviso: formato de hash não suportado ou inválido:", e)
+        return False
+
+
+def exigir_admin(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        token = _token_do_request()
+        if not token:
+            return _erro("Autenticação necessária.", 401)
+
+        with conectar() as conn:
+            if not conn:
+                return _erro("Erro de conexão com o banco de dados.", 500)
+            try:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                cursor.execute("""
+                    SELECT u.id, u.nome, u.email, u.nivel
+                    FROM sessao s
+                    JOIN usuario u ON u.id = s.usuario_id
+                    WHERE s.token = %s AND s.ativo = true AND s.expira_em > now()
+                      AND u.status = 'ativo'
+                """, (_hash_token(token),))
+                usuario = cursor.fetchone()
+                conn.rollback()  # encerra a transação de leitura
+            except Exception as e:
+                conn.rollback()
+                print("Erro ao validar sessão:", str(e))
+                return _erro("Falha interna ao validar a sessão.", 500)
+
+        if not usuario:
+            return _erro("Sessão inválida ou expirada. Faça login novamente.", 401)
+        if usuario["nivel"] != "admin":
+            return _erro("Acesso restrito a administradores.", 403)
+
+        g.usuario = dict(usuario)
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    dados = request.get_json(silent=True) or {}
+    email = str(dados.get("email") or "").strip().lower()
+    senha = str(dados.get("senha") or "")
+
+    if not email or not senha:
+        return _erro("Informe e-mail e senha.", 400)
+
+    with conectar() as conn:
+        if not conn:
+            return _erro("Erro de conexão com o banco de dados.", 500)
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT id, nome, email, senha_hash, nivel, status
+                FROM usuario WHERE LOWER(email) = %s LIMIT 1
+            """, (email,))
+            usuario = cursor.fetchone()
+
+            if not usuario:
+                check_password_hash(_HASH_FALSO, senha)
+                conn.rollback()
+                return _erro("E-mail ou senha inválidos.", 401)
+
+            if not senha_confere(usuario["senha_hash"], senha):
+                conn.rollback()
+                return _erro("E-mail ou senha inválidos.", 401)
+
+            if usuario["status"] != "ativo":
+                conn.rollback()
+                return _erro("Esta conta está inativa ou banida.", 403)
+
+            token = secrets.token_urlsafe(32)
+            ip = _ip_cliente()
+            cursor.execute("""
+                INSERT INTO sessao (usuario_id, token, ip, user_agent, expira_em)
+                VALUES (%s, %s, %s, %s, now() + make_interval(secs => %s))
+            """, (usuario["id"], _hash_token(token), ip, request.headers.get("User-Agent"), SESSAO_VALIDADE_SEGUNDOS))
+            cursor.execute("""
+                INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
+                VALUES (%s, 'login', 'Login realizado via API', %s)
+            """, (usuario["id"], ip))
+            conn.commit()
+
+            return jsonify({
+                "status": "SUCESSO",
+                "token": token,
+                "expira_em": SESSAO_VALIDADE_SEGUNDOS,
+                "usuario": {
+                    "id": usuario["id"],
+                    "nome": usuario["nome"],
+                    "email": usuario["email"],
+                    "nivel": usuario["nivel"],
+                    "admin": usuario["nivel"] == "admin",
+                },
+            }), 200
+
+        except Exception as e:
+            conn.rollback()
+            print("Erro no login:", str(e))
+            return _erro("Falha interna ao processar o login.", 500)
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    token = _token_do_request()
+    if not token:
+        return _erro("Autenticação necessária.", 401)
+
+    with conectar() as conn:
+        if not conn:
+            return _erro("Erro de conexão com o banco de dados.", 500)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE sessao SET ativo = false WHERE token = %s AND ativo = true RETURNING usuario_id",
+                (_hash_token(token),),
+            )
+            linha = cursor.fetchone()
+            if linha:
+                cursor.execute("""
+                    INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
+                    VALUES (%s, 'logout', 'Logout realizado via API', %s)
+                """, (linha[0], _ip_cliente()))
+            conn.commit()
+            return jsonify({"status": "SUCESSO", "mensagem": "Sessão encerrada."}), 200
+        except Exception as e:
+            conn.rollback()
+            print("Erro no logout:", str(e))
+            return _erro("Falha interna ao encerrar a sessão.", 500)
+
+
+@app.route("/api/admin/denuncias", methods=["GET"])
+@exigir_admin
+def api_admin_listar_denuncias():
+    """Lista as denúncias de um número (com os IDs necessários para deletar)."""
+    variantes = variantes_telefone(request.args.get("telefone"))
+    if not variantes:
+        return _erro("Informe o parâmetro 'telefone'.", 400)
+
+    with conectar() as conn:
+        if not conn:
+            return _erro("Erro de conexão com o banco de dados.", 500)
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(r"""
+                SELECT d.id, d.tipo, d.descricao, d.data_registro, d.usuario_id,
+                       t.id AS telefone_id, t.numero
+                FROM denuncia d
+                JOIN telefone t ON d.telefone_id = t.id
+                WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = ANY(%s)
+                ORDER BY d.id
+            """, (variantes,))
+            denuncias = [dict(r) for r in cursor.fetchall()]
+            conn.rollback()  # encerra a transação de leitura
+            return jsonify({"status": "SUCESSO", "total": len(denuncias), "denuncias": denuncias}), 200
+        except Exception as e:
+            conn.rollback()
+            print("Erro ao listar denúncias:", str(e))
+            return _erro("Falha interna ao listar denúncias.", 500)
+
+
+@app.route("/api/admin/denuncias/<int:denuncia_id>", methods=["DELETE"])
+@exigir_admin
+def api_admin_deletar_denuncia(denuncia_id):
+    with conectar() as conn:
+        if not conn:
+            return _erro("Erro de conexão com o banco de dados.", 500)
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                DELETE FROM denuncia WHERE id = %s
+                RETURNING id, telefone_id, tipo, descricao, usuario_id
+            """, (denuncia_id,))
+            removida = cursor.fetchone()
+
+            if not removida:
+                conn.rollback()
+                return _erro("Denúncia não encontrada.", 404)
+
+            cursor.execute("""
+                INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
+                VALUES (%s, 'removeu_denuncia', %s, %s)
+            """, (
+                g.usuario["id"],
+                f"Denúncia {removida['id']} removida (telefone_id={removida['telefone_id']}, tipo={removida['tipo']})",
+                _ip_cliente(),
+            ))
+            conn.commit()
+            return jsonify({
+                "status": "SUCESSO",
+                "mensagem": "Denúncia removida com sucesso.",
+                "removida": dict(removida),
+            }), 200
+        except Exception as e:
+            conn.rollback()
+            print("Erro ao deletar denúncia:", str(e))
+            return _erro("Falha interna ao deletar a denúncia.", 500)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
