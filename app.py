@@ -435,86 +435,80 @@ def api_registrar_denuncia():
             }), 500
 
 # =========================================================================
-# AUTENTICAÇÃO (LOGIN + SESSÃO NO BANCO) E ÁREA ADMINISTRATIVA
+# AUTENTICAÇÃO (LOGIN / LOGOUT) E ÁREA ADMINISTRATIVA
 # =========================================================================
-SESSAO_VALIDADE_SEGUNDOS = 60 * 60 * 8  # 8 horas
-# Hash descartável: iguala o tempo de resposta quando o e-mail não existe (evita enumeração de usuários)
-_HASH_FALSO = generate_password_hash("senha-falsa")
+# Fluxo: /api/login devolve um token; o React envia esse token no header
+# "Authorization: Bearer <token>" nas rotas /api/admin/*.
+# Usamos token (e não cookie de sessão) porque front e API estão em domínios
+# diferentes no Render. Só o SHA-256 do token é gravado na tabela "sessao".
+SESSAO_HORAS = int(os.getenv("SESSAO_HORAS", "8"))
+NIVEIS_ADMIN = ("admin",)  # para liberar moderadores: ("admin", "moderador")
 
-
-def _erro(mensagem, codigo):
-    return jsonify({"status": "ERRO", "mensagem": mensagem}), codigo
-
-
-def _ip_cliente():
-    encaminhado = request.headers.get("X-Forwarded-For", "")
-    ip = encaminhado.split(",")[0].strip() if encaminhado else (request.remote_addr or "")
-    return ip[:45]
-
+# Hash falso usado para gastar o mesmo tempo quando o e-mail não existe
+# (evita descobrir quais e-mails estão cadastrados pelo tempo de resposta).
+HASH_FALSO = generate_password_hash("senha-falsa-para-igualar-tempo")
 
 def _hash_token(token):
-    # No banco fica só o SHA-256 do token: um vazamento da tabela não expõe sessões válidas
-    return hashlib.sha256(token.encode()).hexdigest()
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
+def _ip_cliente():
+    # Atrás do proxy do Render, o IP real vem em X-Forwarded-For
+    xff = request.headers.get("X-Forwarded-For", "")
+    ip = xff.split(",")[0].strip() if xff else (request.remote_addr or "")
+    return ip[:45]
 
-def _token_do_request():
-    cabecalho = request.headers.get("Authorization", "")
-    return cabecalho[7:].strip() if cabecalho.startswith("Bearer ") else None
-
-
-def variantes_telefone(tel):
-    """Gera as formas equivalentes de um número (com/sem 55) para comparar com o banco."""
-    limpo = limpar_telefone(tel)
-    if not limpo:
-        return []
-    sem_55 = limpo[2:] if limpo.startswith("55") else limpo
-    return list({limpo, sem_55, "55" + sem_55})
-
-
-def senha_confere(hash_armazenado, senha):
-    h = hash_armazenado or ""
+def _senha_confere(hash_armazenado, senha):
     try:
-        if h.startswith("$2"):  # bcrypt (só funciona se o pacote 'bcrypt' estiver instalado)
-            import bcrypt
-            return bcrypt.checkpw(senha.encode(), h.encode())
-        return check_password_hash(h, senha)  # werkzeug: scrypt / pbkdf2
-    except Exception as e:
-        print("Aviso: formato de hash não suportado ou inválido:", e)
+        return check_password_hash(hash_armazenado, senha)
+    except ValueError:
         return False
 
+def registrar_acao(cursor, usuario_id, acao, descricao=None):
+    """Grava em historico_acao usando o mesmo cursor (mesma transação)."""
+    cursor.execute("""
+        INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
+        VALUES (%s, %s, %s, %s)
+    """, (usuario_id, acao, descricao, _ip_cliente()))
 
-def exigir_admin(f):
+def _variantes_telefone(telefone):
+    """'11 4979-3300' -> ('1149793300', '551149793300')."""
+    limpo = limpar_telefone(telefone)
+    if not limpo:
+        return ()
+    sem_55 = limpo[2:] if limpo.startswith("55") else limpo
+    return tuple({sem_55, "55" + sem_55, limpo})
+
+def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        token = _token_do_request()
-        if not token:
-            return _erro("Autenticação necessária.", 401)
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return jsonify({"status": "ERRO", "mensagem": "Autenticação necessária."}), 401
+        token = auth[7:].strip()
 
+        usuario = None
         with conectar() as conn:
             if not conn:
-                return _erro("Erro de conexão com o banco de dados.", 500)
+                return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
             try:
                 cursor = conn.cursor(cursor_factory=RealDictCursor)
                 cursor.execute("""
-                    SELECT u.id, u.nome, u.email, u.nivel
+                    SELECT u.id, u.nome, u.email, u.nivel, u.status
                     FROM sessao s
                     JOIN usuario u ON u.id = s.usuario_id
                     WHERE s.token = %s AND s.ativo = true AND s.expira_em > now()
-                      AND u.status = 'ativo'
                 """, (_hash_token(token),))
                 usuario = cursor.fetchone()
-                conn.rollback()  # encerra a transação de leitura
             except Exception as e:
-                conn.rollback()
                 print("Erro ao validar sessão:", str(e))
-                return _erro("Falha interna ao validar a sessão.", 500)
+                return jsonify({"status": "ERRO", "mensagem": "Falha ao validar a sessão."}), 500
 
-        if not usuario:
-            return _erro("Sessão inválida ou expirada. Faça login novamente.", 401)
-        if usuario["nivel"] != "admin":
-            return _erro("Acesso restrito a administradores.", 403)
+        if not usuario or usuario["status"] != "ativo":
+            return jsonify({"status": "ERRO", "mensagem": "Sessão inválida ou expirada."}), 401
+        if usuario["nivel"] not in NIVEIS_ADMIN:
+            return jsonify({"status": "ERRO", "mensagem": "Acesso restrito a administradores."}), 403
 
-        g.usuario = dict(usuario)
+        g.usuario = usuario
         return f(*args, **kwargs)
     return wrapper
 
@@ -526,158 +520,210 @@ def api_login():
     senha = str(dados.get("senha") or "")
 
     if not email or not senha:
-        return _erro("Informe e-mail e senha.", 400)
+        return jsonify({"status": "ERRO", "mensagem": "Informe e-mail e senha."}), 400
 
     with conectar() as conn:
         if not conn:
-            return _erro("Erro de conexão com o banco de dados.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute("""
                 SELECT id, nome, email, senha_hash, nivel, status
-                FROM usuario WHERE LOWER(email) = %s LIMIT 1
+                FROM usuario
+                WHERE LOWER(email) = %s
             """, (email,))
             usuario = cursor.fetchone()
 
-            if not usuario:
-                check_password_hash(_HASH_FALSO, senha)
-                conn.rollback()
-                return _erro("E-mail ou senha inválidos.", 401)
+            senha_ok = _senha_confere(usuario["senha_hash"] if usuario else HASH_FALSO, senha)
 
-            if not senha_confere(usuario["senha_hash"], senha):
-                conn.rollback()
-                return _erro("E-mail ou senha inválidos.", 401)
+            if not usuario or not senha_ok:
+                return jsonify({"status": "ERRO", "mensagem": "E-mail ou senha inválidos."}), 401
 
             if usuario["status"] != "ativo":
-                conn.rollback()
-                return _erro("Esta conta está inativa ou banida.", 403)
+                return jsonify({"status": "ERRO", "mensagem": "Esta conta está inativa ou foi banida."}), 403
 
             token = secrets.token_urlsafe(32)
-            ip = _ip_cliente()
             cursor.execute("""
                 INSERT INTO sessao (usuario_id, token, ip, user_agent, expira_em)
-                VALUES (%s, %s, %s, %s, now() + make_interval(secs => %s))
-            """, (usuario["id"], _hash_token(token), ip, request.headers.get("User-Agent"), SESSAO_VALIDADE_SEGUNDOS))
-            cursor.execute("""
-                INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
-                VALUES (%s, 'login', 'Login realizado via API', %s)
-            """, (usuario["id"], ip))
+                VALUES (%s, %s, %s, %s, now() + make_interval(hours => %s))
+                RETURNING expira_em
+            """, (usuario["id"], _hash_token(token), _ip_cliente(),
+                  request.headers.get("User-Agent"), SESSAO_HORAS))
+            expira_em = cursor.fetchone()["expira_em"]
+
+            registrar_acao(cursor, usuario["id"], "login", "Login via API")
             conn.commit()
 
             return jsonify({
                 "status": "SUCESSO",
+                "mensagem": "Login realizado com sucesso.",
                 "token": token,
-                "expira_em": SESSAO_VALIDADE_SEGUNDOS,
+                "expira_em": expira_em.isoformat(),
                 "usuario": {
                     "id": usuario["id"],
                     "nome": usuario["nome"],
                     "email": usuario["email"],
-                    "nivel": usuario["nivel"],
-                    "admin": usuario["nivel"] == "admin",
-                },
+                    "nivel": usuario["nivel"]
+                }
             }), 200
 
         except Exception as e:
-            conn.rollback()
+            if conn: conn.rollback()
             print("Erro no login:", str(e))
-            return _erro("Falha interna ao processar o login.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Falha interna ao realizar o login."}), 500
 
 
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
-    token = _token_do_request()
-    if not token:
-        return _erro("Autenticação necessária.", 401)
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return jsonify({"status": "ERRO", "mensagem": "Autenticação necessária."}), 401
+    token_hash = _hash_token(auth[7:].strip())
 
     with conectar() as conn:
         if not conn:
-            return _erro("Erro de conexão com o banco de dados.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
         try:
             cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE sessao SET ativo = false WHERE token = %s AND ativo = true RETURNING usuario_id",
-                (_hash_token(token),),
-            )
-            linha = cursor.fetchone()
-            if linha:
-                cursor.execute("""
-                    INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
-                    VALUES (%s, 'logout', 'Logout realizado via API', %s)
-                """, (linha[0], _ip_cliente()))
+            cursor.execute("""
+                UPDATE sessao SET ativo = false
+                WHERE token = %s AND ativo = true
+                RETURNING usuario_id
+            """, (token_hash,))
+            row = cursor.fetchone()
+            if row:
+                registrar_acao(cursor, row[0], "logout", "Logout via API")
             conn.commit()
             return jsonify({"status": "SUCESSO", "mensagem": "Sessão encerrada."}), 200
         except Exception as e:
-            conn.rollback()
+            if conn: conn.rollback()
             print("Erro no logout:", str(e))
-            return _erro("Falha interna ao encerrar a sessão.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Falha interna ao encerrar a sessão."}), 500
+
+
+# -------------------------------------------------------------------------
+# ADMIN: DENÚNCIAS
+# -------------------------------------------------------------------------
+def _desmarcar_suspeitos(cursor, telefone_ids):
+    """Telefones que ficaram sem nenhuma denúncia deixam de ser 'suspeito'."""
+    if not telefone_ids:
+        return
+    cursor.execute("""
+        UPDATE telefone SET suspeito = false
+        WHERE id = ANY(%s)
+          AND NOT EXISTS (SELECT 1 FROM denuncia d WHERE d.telefone_id = telefone.id)
+    """, (list(telefone_ids),))
 
 
 @app.route("/api/admin/denuncias", methods=["GET"])
-@exigir_admin
+@admin_required
 def api_admin_listar_denuncias():
-    """Lista as denúncias de um número (com os IDs necessários para deletar)."""
-    variantes = variantes_telefone(request.args.get("telefone"))
-    if not variantes:
-        return _erro("Informe o parâmetro 'telefone'.", 400)
+    """Lista denúncias (opcionalmente de um número) para achar o id certo."""
+    variantes = _variantes_telefone(request.args.get("telefone", ""))
 
     with conectar() as conn:
         if not conn:
-            return _erro("Erro de conexão com o banco de dados.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
         try:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute(r"""
-                SELECT d.id, d.tipo, d.descricao, d.data_registro, d.usuario_id,
-                       t.id AS telefone_id, t.numero
+            filtro, params = "", []
+            if variantes:
+                filtro = r"WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') IN %s"
+                params.append(variantes)
+
+            cursor.execute(f"""
+                SELECT d.id, t.numero AS telefone, d.tipo, d.descricao,
+                       d.data_registro, d.usuario_id, e.nome AS empresa
                 FROM denuncia d
-                JOIN telefone t ON d.telefone_id = t.id
-                WHERE REGEXP_REPLACE(t.numero, '\D', '', 'g') = ANY(%s)
-                ORDER BY d.id
-            """, (variantes,))
-            denuncias = [dict(r) for r in cursor.fetchall()]
-            conn.rollback()  # encerra a transação de leitura
+                JOIN telefone t ON t.id = d.telefone_id
+                LEFT JOIN empresa e ON e.id = t.empresa_id
+                {filtro}
+                ORDER BY d.data_registro DESC
+                LIMIT 100
+            """, params)
+
+            denuncias = cursor.fetchall()
+            for d in denuncias:
+                d["data_registro"] = d["data_registro"].isoformat()
             return jsonify({"status": "SUCESSO", "total": len(denuncias), "denuncias": denuncias}), 200
         except Exception as e:
-            conn.rollback()
             print("Erro ao listar denúncias:", str(e))
-            return _erro("Falha interna ao listar denúncias.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Falha ao listar denúncias."}), 500
 
 
 @app.route("/api/admin/denuncias/<int:denuncia_id>", methods=["DELETE"])
-@exigir_admin
+@admin_required
 def api_admin_deletar_denuncia(denuncia_id):
+    """Remove UMA denúncia pelo id."""
     with conectar() as conn:
         if not conn:
-            return _erro("Erro de conexão com o banco de dados.", 500)
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
         try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor()
             cursor.execute("""
                 DELETE FROM denuncia WHERE id = %s
-                RETURNING id, telefone_id, tipo, descricao, usuario_id
+                RETURNING telefone_id, tipo
             """, (denuncia_id,))
-            removida = cursor.fetchone()
-
-            if not removida:
+            row = cursor.fetchone()
+            if not row:
                 conn.rollback()
-                return _erro("Denúncia não encontrada.", 404)
+                return jsonify({"status": "ERRO", "mensagem": "Denúncia não encontrada."}), 404
 
-            cursor.execute("""
-                INSERT INTO historico_acao (usuario_id, acao, descricao, ip)
-                VALUES (%s, 'removeu_denuncia', %s, %s)
-            """, (
-                g.usuario["id"],
-                f"Denúncia {removida['id']} removida (telefone_id={removida['telefone_id']}, tipo={removida['tipo']})",
-                _ip_cliente(),
-            ))
+            telefone_id, tipo = row
+            _desmarcar_suspeitos(cursor, [telefone_id])
+            registrar_acao(cursor, g.usuario["id"], "removeu_denuncia",
+                           f"Denúncia #{denuncia_id} ({tipo}) removida do telefone_id {telefone_id}")
+            conn.commit()
+            return jsonify({"status": "SUCESSO", "mensagem": f"Denúncia #{denuncia_id} removida."}), 200
+        except Exception as e:
+            if conn: conn.rollback()
+            print("Erro ao deletar denúncia:", str(e))
+            return jsonify({"status": "ERRO", "mensagem": "Falha interna ao remover a denúncia."}), 500
+
+
+@app.route("/api/admin/denuncias", methods=["DELETE"])
+@admin_required
+def api_admin_deletar_denuncias_por_telefone():
+    """Remove TODAS as denúncias de um número: DELETE /api/admin/denuncias?telefone=1149793300"""
+    telefone = request.args.get("telefone", "")
+    variantes = _variantes_telefone(telefone)
+
+    # Trava de segurança: evita apagar denúncias por engano com um número curto/vazio
+    if not variantes or len(limpar_telefone(telefone)) < 8:
+        return jsonify({"status": "ERRO", "mensagem": "Informe um telefone válido (mín. 8 dígitos)."}), 400
+
+    with conectar() as conn:
+        if not conn:
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco de dados."}), 500
+        try:
+            cursor = conn.cursor()
+            cursor.execute(r"""
+                DELETE FROM denuncia
+                WHERE telefone_id IN (
+                    SELECT id FROM telefone
+                    WHERE REGEXP_REPLACE(numero, '\D', '', 'g') IN %s
+                )
+                RETURNING id, telefone_id, tipo
+            """, (variantes,))
+            removidas = cursor.fetchall()
+            if not removidas:
+                conn.rollback()
+                return jsonify({"status": "ERRO", "mensagem": "Nenhuma denúncia encontrada para este número."}), 404
+
+            _desmarcar_suspeitos(cursor, {r[1] for r in removidas})
+            ids = ", ".join(f"#{r[0]}" for r in removidas)
+            registrar_acao(cursor, g.usuario["id"], "removeu_denuncia",
+                           f"{len(removidas)} denúncia(s) removida(s) do número {limpar_telefone(telefone)}: {ids}")
             conn.commit()
             return jsonify({
                 "status": "SUCESSO",
-                "mensagem": "Denúncia removida com sucesso.",
-                "removida": dict(removida),
+                "mensagem": f"{len(removidas)} denúncia(s) removida(s).",
+                "removidas": [r[0] for r in removidas]
             }), 200
         except Exception as e:
-            conn.rollback()
-            print("Erro ao deletar denúncia:", str(e))
-            return _erro("Falha interna ao deletar a denúncia.", 500)
+            if conn: conn.rollback()
+            print("Erro ao deletar denúncias por telefone:", str(e))
+            return jsonify({"status": "ERRO", "mensagem": "Falha interna ao remover as denúncias."}), 500
 
 
 if __name__ == "__main__":
