@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -9,7 +9,8 @@ import re
 import unicodedata
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "chave_segura_acex")
+# Credenciais ocultadas: o valor real será injetado pelo Render
+app.secret_key = os.getenv("SECRET_KEY", "chave_desenvolvimento_local")
 CORS(app, resources={r"/api/*": {"origins": "https://callcheck-1.onrender.com"}})
 
 # =========================
@@ -17,7 +18,8 @@ CORS(app, resources={r"/api/*": {"origins": "https://callcheck-1.onrender.com"}}
 # =========================
 MIN_CONNS = 1
 MAX_CONNS = 20
-DB_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_o51wyEXnCMpg@ep-plain-morning-ac3tue24-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+# Credenciais ocultadas: o valor real será injetado pelo Render
+DB_URL = os.getenv("DATABASE_URL", "postgresql://localhost/banco_local")
 
 pool = None
 try:
@@ -92,15 +94,13 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             telefone_limpo = limpar_telefone(telefone)
             
-            # Movido para cima para ser usado no PASSO 1 também (evita falha na verificação de denúncia)
             tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
 
             # ==============================================================
-            # PASSO 1: VERIFICAÇÃO DE DENÚNCIAS (PRIORIDADE MÁXIMA PARA BUSCA POR TEL)
+            # PASSO 1: VERIFICAÇÃO DE DENÚNCIAS
             # ==============================================================
             if telefone_limpo:
                 try:
-                    # Agora verifica o número com e sem o 55
                     cursor.execute("""
                         SELECT d.tipo, d.descricao 
                         FROM denuncia d
@@ -123,7 +123,6 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
                         }
                 except Exception as e:
                     print("Aviso: Falha ao consultar denúncias.", e)
-
 
             # ==============================================================
             # CENÁRIO 1: BUSCA POR NOME + TELEFONE
@@ -301,7 +300,7 @@ def verificar_empresa(nome=None, telefone=None, pagina=1, uf=None):
 
 
 # =========================================================================
-# ROTA EXCLUSIVA PARA ATENDER O FRONTEND EM REACT
+# ROTAS DA API RESTful (Consumidas pelo Frontend React)
 # =========================================================================
 @app.route("/api/validar", methods=["POST"])
 def api_validar_telefone():
@@ -325,9 +324,6 @@ def api_validar_telefone():
 
     resposta_db = verificar_empresa(nome, telefone, pagina, uf)
     
-    # =====================================================
-    # SE FOR UMA LISTA (BUSCA POR NOME)
-    # =====================================================
     if resposta_db.get("status") == "LISTA":
         resultados = resposta_db.get("resultados", [])
         if resultados:
@@ -375,27 +371,6 @@ def api_validar_telefone():
     else:
         return jsonify({"status": "invalid", "dados": resposta_db})
 
-
-# =========================
-# ROTAS PÚBLICAS E DENÚNCIAS
-# =========================
-@app.route("/", methods=["GET", "POST"])
-def index():
-    resultado = None
-    erro_formulario = None
-    nome = (request.form.get("nome") or request.args.get("nome", "")).strip()
-    telefone = (request.form.get("telefone") or request.args.get("telefone", "")).strip()
-    uf = (request.form.get("uf") or request.args.get("uf", "")).strip()
-    pagina = request.args.get("pagina", 1, type=int)
-
-    if request.method == "POST" or (request.method == "GET" and nome):
-        if not nome and not telefone:
-            if request.method == "POST": erro_formulario = "Informe nome ou telefone"
-        else:
-            resultado = verificar_empresa(nome, telefone, pagina, uf)
-    return render_template("index.html", resultado=resultado, erro_formulario=erro_formulario)
-
-
 @app.route("/api/denuncias", methods=["POST"])
 def api_registrar_denuncia():
     dados = request.get_json()
@@ -413,7 +388,6 @@ def api_registrar_denuncia():
     if not tipo_denuncia:
         return jsonify({"status": "ERRO", "mensagem": "Selecione o motivo da denúncia (Golpe, Spam, etc)."}), 400
 
-    # Blindagem para associar corretamente independentemente de como o front manda
     tel_sem_55 = telefone_limpo[2:] if telefone_limpo.startswith('55') else telefone_limpo
 
     with conectar() as conn:
@@ -422,7 +396,6 @@ def api_registrar_denuncia():
         try:
             cursor = conn.cursor()
             
-            # Verifica com e sem o 55 para achar o telefone base
             cursor.execute("""
                 SELECT id FROM telefone 
                 WHERE REGEXP_REPLACE(numero, '\D', '', 'g') IN (%s, %s)
@@ -471,180 +444,6 @@ def api_registrar_denuncia():
                 "status": "ERRO", 
                 "mensagem": f"Falha interna no banco de dados: {str(e)}"
             }), 500
-
-
-@app.route("/sobre")
-def sobre():
-    return render_template("sobre.html")
-
-@app.route("/contato")
-def contato():
-    return render_template("contato.html")
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if "usuario_logado" in session: return redirect(url_for('perfil_usuario'))
-    erro = None
-    if request.method == "POST":
-        usuario_input = request.form.get("usuario") 
-        senha = request.form.get("senha")
-        
-        with conectar() as conn:
-            if conn:
-                try:
-                    cursor = conn.cursor(cursor_factory=RealDictCursor)
-                    cursor.execute("""
-                        SELECT id, nome, email 
-                        FROM usuario 
-                        WHERE email = %s AND senha = %s 
-                        LIMIT 1
-                    """, (usuario_input, senha))
-                    user = cursor.fetchone()
-                    
-                    if user:
-                        session["usuario_logado"] = user["nome"]
-                        session["usuario_id"] = user["id"]
-                        return redirect(url_for('perfil_usuario'))
-                    else:
-                        erro = "Usuário ou senha incorretos."
-                except Exception as e:
-                    print("Erro no DB durante o login:", e)
-                    erro = "Ocorreu um erro ao processar o login."
-            else:
-                erro = "Erro de conexão ao banco de dados."
-
-    return render_template("login.html", erro=erro)
-
-@app.route("/usuario", methods=["GET", "POST"])
-def perfil_usuario():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    resultado_local = None
-    if request.method == "POST":
-        nome = request.form.get("nome", "").strip()
-        telefone = request.form.get("telefone", "").strip()
-        uf = request.form.get("uf", "").strip()
-        if nome or telefone:
-            resultado_local = verificar_empresa(nome, telefone, 1, uf)
-            pesquisas = session.get('pesquisas_recentes', [])
-            pesquisas.insert(0, resultado_local)
-            session['pesquisas_recentes'] = pesquisas[:5]
-            session.modified = True
-    return render_template("usuario.html", pesquisas=session.get('pesquisas_recentes', []), resultado_modal=resultado_local)
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-@app.route("/historico")
-def historico():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    pesquisas = session.get('pesquisas_recentes', [])
-    return render_template("em_obras.html", pesquisas=pesquisas)
-
-@app.route("/denuncia")
-def denuncia():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    return render_template("em_obras.html")
-
-@app.route("/admin")
-def admin():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    return render_template("admin.html")
-
-@app.route("/admin/empresas")
-def listar_empresas():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    uf_filtro = request.args.get('uf', '').upper()
-    pagina = request.args.get('pagina', 1, type=int)
-    por_pagina = 100
-    offset = (pagina - 1) * por_pagina
-
-    with conectar() as conn:
-        if not conn: return "Erro de conexão ao banco", 500
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            
-            cursor.execute("SELECT COUNT(*) FROM empresa WHERE nome IS NOT NULL AND nome != ''")
-            total_reg = cursor.fetchone()['count']
-            
-            query = """
-                SELECT 
-                    e.cnpj AS cnpj_base, 
-                    e.nome AS nome_fantasia, 
-                    '' AS ddd1, 
-                    t.numero AS telefone1, 
-                    '' AS uf 
-                FROM empresa e
-                LEFT JOIN telefone t ON t.empresa_id = e.id AND t.principal = true
-                WHERE e.nome IS NOT NULL AND e.nome != ''
-                ORDER BY e.nome ASC 
-                LIMIT %s OFFSET %s
-            """
-            cursor.execute(query, (por_pagina, offset))
-            empresas = cursor.fetchall()
-            
-            return render_template("empresas.html", empresas=empresas, pagina=pagina, total_paginas=(total_reg // por_pagina) + 1, total_registros=total_reg, uf_atual=uf_filtro)
-        except Exception as e:
-            return str(e), 500
-
-@app.route("/admin/empresa/<cnpj_base>")
-def visualizar_empresa(cnpj_base):
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-    with conectar() as conn:
-        if not conn: return "Erro de conexão", 500
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            
-            cursor.execute("""
-                SELECT id, nome AS nome_fantasia, cnpj, verificada 
-                FROM empresa 
-                WHERE cnpj = %s LIMIT 1
-            """, (str(cnpj_base),))
-            empresa = cursor.fetchone()
-            
-            if empresa:
-                cursor.execute("""
-                    SELECT numero, tipo, suspeito, principal 
-                    FROM telefone 
-                    WHERE empresa_id = %s
-                """, (empresa['id'],))
-                telefones = cursor.fetchall()
-                
-                for idx, t in enumerate(telefones):
-                    empresa[f"telefone_{idx+1}"] = t['numero']
-                    empresa[f"tipo_{idx+1}"] = t['tipo']
-                    empresa[f"suspeito_{idx+1}"] = "Sim" if t['suspeito'] else "Não"
-
-            return render_template("detalhes_empresa.html", empresa=empresa)
-        except Exception as e:
-            return str(e), 500
-
-@app.route("/database_view")
-def database_view():
-    if "usuario_logado" not in session: return redirect(url_for('login'))
-
-    with conectar() as conn:
-        if conn is None: return "Erro ao conectar ao banco de dados.", 500
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("""
-                SELECT 
-                    e.cnpj AS cnpj_base, 
-                    e.nome AS nome_fantasia, 
-                    '' AS ddd1, 
-                    t.numero AS telefone1, 
-                    '' AS uf 
-                FROM empresa e
-                LEFT JOIN telefone t ON t.empresa_id = e.id AND t.principal = true
-                WHERE e.nome IS NOT NULL AND e.nome != ''
-                ORDER BY e.nome ASC
-                LIMIT 100
-            """)
-            registros = cursor.fetchall()
-            return render_template("database_view.html", registros=registros)
-        except Exception as e:
-            return f"Erro na consulta: {str(e)}", 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
