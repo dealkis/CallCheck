@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
-import CallCheckPage from "./CallCheckPage";
-import Login from "./Login";
-import AdminPanel from "./AdminPanel";
+import CallCheckPage from "./pages/CallCheckPage";
+import Login from "./pages/Login";
+import AdminPanel from "./pages/AdminPanel";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://callcheck.onrender.com").replace(/\/$/, "");
 
