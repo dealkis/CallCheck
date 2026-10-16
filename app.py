@@ -726,5 +726,123 @@ def api_admin_deletar_denuncias_por_telefone():
             return jsonify({"status": "ERRO", "mensagem": "Falha interna ao remover as denúncias."}), 500
 
 
+
+# -------------------------------------------------------------------------
+# AUTENTICAÇÃO DA ÁREA DO USUÁRIO E ENDPOINTS ADMINISTRATIVOS COMPLEMENTARES
+# -------------------------------------------------------------------------
+def usuario_required(f):
+    """Valida qualquer usuário autenticado, não apenas administradores."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return jsonify({"status": "ERRO", "mensagem": "Autenticação necessária."}), 401
+        token = auth[7:].strip()
+        with conectar() as conn:
+            if not conn:
+                return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco."}), 500
+            try:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                cursor.execute("""
+                    SELECT u.id, u.nome, u.email, u.nivel, u.status
+                    FROM sessao s JOIN usuario u ON u.id = s.usuario_id
+                    WHERE s.token = %s AND s.ativo = true AND s.expira_em > now()
+                """, (_hash_token(token),))
+                usuario = cursor.fetchone()
+            except Exception:
+                return jsonify({"status": "ERRO", "mensagem": "Falha ao validar sessão."}), 500
+        if not usuario or usuario["status"] != "ativo":
+            return jsonify({"status": "ERRO", "mensagem": "Sessão inválida ou expirada."}), 401
+        g.usuario = usuario
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/api/me", methods=["GET"])
+@usuario_required
+def api_me():
+    return jsonify({"status": "SUCESSO", "usuario": dict(g.usuario)}), 200
+
+
+@app.route("/api/admin/status-db", methods=["GET"])
+@admin_required
+def api_admin_status_db():
+    """Testa uma consulta real no NeonDB; não expõe URL nem credenciais."""
+    with conectar() as conn:
+        if not conn:
+            return jsonify({"status": "ERRO", "conectado": False,
+                            "mensagem": "Pool de conexão indisponível. Confira DATABASE_URL."}), 503
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+            return jsonify({"status": "SUCESSO", "conectado": True,
+                            "mensagem": "Conexão com o banco de dados estabelecida."}), 200
+        except Exception as e:
+            conn.rollback()
+            print("Falha no teste de conexão com o banco:", str(e))
+            return jsonify({"status": "ERRO", "conectado": False,
+                            "mensagem": "Não foi possível consultar o banco de dados."}), 503
+
+
+@app.route("/api/admin/usuarios", methods=["GET"])
+@admin_required
+def api_admin_listar_usuarios():
+    with conectar() as conn:
+        if not conn:
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco."}), 500
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT id, nome, email, nivel, status
+                FROM usuario
+                ORDER BY nome ASC
+            """)
+            return jsonify({"status": "SUCESSO", "usuarios": cursor.fetchall()}), 200
+        except Exception as e:
+            print("Erro ao listar usuários:", str(e))
+            return jsonify({"status": "ERRO", "mensagem": "Falha ao listar usuários."}), 500
+
+
+@app.route("/api/admin/usuarios/permissoes", methods=["PUT"])
+@admin_required
+def api_admin_alterar_permissao():
+    dados = request.get_json(silent=True) or {}
+    try:
+        usuario_id = int(dados.get("usuario_id"))
+    except (TypeError, ValueError):
+        return jsonify({"status": "ERRO", "mensagem": "Informe um usuario_id válido."}), 400
+    tornar_admin = dados.get("admin")
+    if not isinstance(tornar_admin, bool):
+        return jsonify({"status": "ERRO", "mensagem": "O campo 'admin' deve ser true ou false."}), 400
+    if usuario_id == g.usuario["id"] and not tornar_admin:
+        return jsonify({"status": "ERRO", "mensagem": "Você não pode remover sua própria permissão administrativa."}), 400
+
+    novo_nivel = "admin" if tornar_admin else "usuario"
+    with conectar() as conn:
+        if not conn:
+            return jsonify({"status": "ERRO", "mensagem": "Erro de conexão com o banco."}), 500
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                UPDATE usuario SET nivel = %s
+                WHERE id = %s
+                RETURNING id, nome, email, nivel, status
+            """, (novo_nivel, usuario_id))
+            atualizado = cursor.fetchone()
+            if not atualizado:
+                conn.rollback()
+                return jsonify({"status": "ERRO", "mensagem": "Usuário não encontrado."}), 404
+            registrar_acao(cursor, g.usuario["id"], "alterou_permissao",
+                           f"Usuário {usuario_id} definido como {novo_nivel}")
+            conn.commit()
+            return jsonify({"status": "SUCESSO", "mensagem": "Permissão atualizada.",
+                            "usuario": atualizado}), 200
+        except Exception as e:
+            conn.rollback()
+            print("Erro ao alterar permissão:", str(e))
+            return jsonify({"status": "ERRO", "mensagem": "Falha ao alterar permissão."}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
